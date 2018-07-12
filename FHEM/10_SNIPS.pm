@@ -1,8 +1,3 @@
-##############################################
-#
-# fhem mqtt bridge for snips (http://snips.ai)
-#
-##############################################
 
 use strict;
 use warnings;
@@ -19,10 +14,7 @@ my %sets = (
 );
 
 my @topics = qw(
-    hermes/intent
-    hermes/dialogueManager/sessionStarted
-    hermes/dialogueManager/sessionQueued
-    hermes/dialogueManager/sessionEnded
+    hermes/intent/+
 );
 
 sub SNIPS_Initialize($) {
@@ -37,6 +29,7 @@ sub SNIPS_Initialize($) {
     $hash->{OnMessageFn} = "SNIPS::onmessage";
 
     main::LoadModule("MQTT");
+    main::LoadModule("MQTT_DEVICE");
 }
 
 package SNIPS;
@@ -72,33 +65,21 @@ sub Define() {
 
     return "Invalid number of arguments: define <name> SNIPS" if (int(@args) < 0);
 
-    my ($name, $type, $topic, $fullTopic) = @args;
+    my ($name, $type) = @args;
 
-    $hash->{TOPIC} = $topic;
     $hash->{MODULE_VERSION} = "0.1";
     $hash->{READY} = 0;
-    $hash->{QOS} = MQTT_QOS_AT_MOST_ONCE;
 
     return MQTT::Client_Define($hash, $def);
 };
-
-sub GetTopicFor($$) {
-    my ($hash, $path) = @_;
-
-    my $prefix = $hash->{PREFIX};
-    my $topic = "$prefix/$path";
-
-    return $topic;
-}
 
 sub Undefine($$) {
     my ($hash, $name) = @_;
 
     foreach (@topics) {
-        my $oldTopic = SNIPS::GetTopicFor($hash, $_);
-        client_unsubscribe_topic($hash, $oldTopic);
+        client_unsubscribe_topic($hash, $_);
 
-        Log3($hash->{NAME}, 5, "automatically unsubscribed from topic: " . $oldTopic);
+        Log3($hash->{NAME}, 5, "Topic unsubscribed: " . $_);
     }
 
     return MQTT::Client_Undefine($hash);
@@ -110,21 +91,21 @@ sub Set($$$@) {
     Log3($hash->{NAME}, 5, "set " . $command . " - value: " . join (" ", @values));
 
     if (defined($sets{$command})) {
-        my $msgid;
-        my $retain = $hash->{".retain"}->{'*'};
-        my $qos = $hash->{".qos"}->{'*'};
+        # my $msgid;
+        # my $retain = $hash->{".retain"}->{'*'};
+        # my $qos = $hash->{".qos"}->{'*'};
+        #
+        # if ($command eq "say") {
+        #     my $topic = "hermes/patho/to/tts";
+        #     my $value = join (" ", @values);
+        #
+        #     $msgid = send_publish($hash->{IODev}, topic => $topic, message => $value, qos => $qos, retain => $retain);
+        #
+        #     Log3($hash->{NAME}, 5, "sent (tts) '" . $value . "' to " . $topic);
+        # }
+        #
+        # $hash->{message_ids}->{$msgid}++ if defined $msgid;
 
-        if ($command eq "say") {
-            my $topic = SNIPS::GetTopicFor($hash, "hermes/patho/to/tts");
-            my $value = join (" ", @values);
-
-            $msgid = send_publish($hash->{IODev}, topic => $topic, message => $value, qos => $qos, retain => $retain);
-
-            Log3($hash->{NAME}, 5, "sent (tts) '" . $value . "' to " . $topic);
-        }
-
-        $hash->{message_ids}->{$msgid}++ if defined $msgid;
-        
     } else {
         return MQTT::DEVICE::Set($hash, $name, $command, @values);
     }
@@ -139,11 +120,10 @@ sub Attr($$$$) {
     if ($attribute eq "IODev") {
         # Subscribe Readings
         foreach (@topics) {
-            my $newTopic = TASMOTA::DEVICE::GetTopicFor($hash, $_);
-            my ($mqos, $mretain, $mtopic, $mvalue, $mcmd) = MQTT::parsePublishCmdStr($newTopic);
-            MQTT::client_subscribe_topic($hash, $mtopic, $mqos, $mretain);
+            my ($mqos, $mretain, $mtopic, $mvalue, $mcmd) = MQTT::parsePublishCmdStr($_);
+            MQTT::client_subscribe_topic($hash,$mtopic,$mqos,$mretain);
 
-            Log3($hash->{NAME}, 5, "automatically subscribed to topic: " . $newTopic);
+            Log3($hash->{NAME}, 5, "Topic subscribed: " . $_);
         }
 
         $hash->{READY} = 1;
@@ -156,165 +136,97 @@ sub onmessage($$$) {
     my ($hash, $topic, $message) = @_;
 
     Log3($hash->{NAME}, 5, "received message '" . $message . "' for topic: " . $topic);
+    my $prefix = "Thyraz";
 
-    if ($topic =~ qr/.*\/?(stat|tele)\/([a-zA-Z1-9]+).*/ip) {
-        my $type = lc($1);
-        my $command = lc($2);
-        my $isJSON = 1;
+    # Update readings
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "lastIntentTopic", $topic);
+    readingsBulkUpdate($hash, "lastIntentPayload", $message);
+    readingsEndUpdate($hash, 1);
 
-        if ($message !~ m/^\s*{.*}\s*$/s) {
-            Log3($hash->{NAME}, 5, "no valid JSON, set reading as plain text: " . $message);
-            $isJSON = 0;
+    # hermes/intent published
+    if ($topic =~ qr/^hermes\/intent\/$prefix:/) {
+        (my $intent = $topic) =~ s/^hermes\/intent\/$prefix://;
+
+        if ($intent = "SwitchOnOff") {
+
         }
-
-        Log3($hash->{NAME}, 5, "matched known type '" . $type . "' with command: " . $command);
-
-        if ($type eq "stat" && $command eq "power") {
-            Log3($hash->{NAME}, 4, "updating state to: '" . lc($message) . "'");
-
-            readingsSingleUpdate($hash, "state", lc($message), 1);
-        } elsif ($isJSON) {
-            Log3($hash->{NAME}, 4, "json in message detected: '" . $message . "'");
-
-            TASMOTA::DEVICE::Decode($hash, $command, $message);
-        } else {
-            Log3($hash->{NAME}, 4, "fallback to plain reading: '" . $message . "'");
-
-            readingsSingleUpdate($hash, $command, $message, 1);
-        }
-    } else {
-        # Forward to "normal" logic
-        MQTT::DEVICE::onmessage($hash, $topic, $message);
     }
+
+    # if ($topic =~ qr/.*\/?(stat|tele)\/([a-zA-Z1-9]+).*/ip) {
+    #     my $type = lc($1);
+    #     my $command = lc($2);
+    #     my $isJSON = 1;
+    #
+    #     if ($message !~ m/^\s*{.*}\s*$/s) {
+    #         Log3($hash->{NAME}, 5, "no valid JSON, set reading as plain text: " . $message);
+    #         $isJSON = 0;
+    #     }
+    #
+    #     Log3($hash->{NAME}, 5, "matched known type '" . $type . "' with command: " . $command);
+    #
+    #     if ($type eq "stat" && $command eq "power") {
+    #         Log3($hash->{NAME}, 4, "updating state to: '" . lc($message) . "'");
+    #
+    #         readingsSingleUpdate($hash, "state", lc($message), 1);
+    #     } elsif ($isJSON) {
+    #         Log3($hash->{NAME}, 4, "json in message detected: '" . $message . "'");
+    #
+    #         TASMOTA::DEVICE::Decode($hash, $command, $message);
+    #     } else {
+    #         Log3($hash->{NAME}, 4, "fallback to plain reading: '" . $message . "'");
+    #
+    #         readingsSingleUpdate($hash, $command, $message, 1);
+    #     }
+    # } else {
+    #     # Forward to "normal" logic
+    #     MQTT::DEVICE::onmessage($hash, $topic, $message);
+    # }
 }
 
 sub Expand($$$$) {
-    my ($hash, $ref, $prefix, $suffix) = @_;
-
-    $prefix = "" if (!$prefix);
-    $suffix = "" if (!$suffix);
-    $suffix = "-$suffix" if ($suffix);
-
-    if (ref($ref) eq "ARRAY") {
-        while (my ($key, $value) = each @{$ref}) {
-            TASMOTA::DEVICE::Expand($hash, $value, $prefix . sprintf("%02i", $key + 1) . "-", "");
-        }
-    } elsif (ref($ref) eq "HASH") {
-        while (my ($key, $value) = each %{$ref}) {
-            if (ref($value)) {
-                TASMOTA::DEVICE::Expand($hash, $value, $prefix . $key . $suffix . "-", "");
-            } else {
-                # replace illegal characters in reading names
-                (my $reading = $prefix . $key . $suffix) =~ s/[^A-Za-z\d_\.\-\/]/_/g;
-                readingsBulkUpdate($hash, lc($reading), $value);
-            }
-        }
-    }
+    # my ($hash, $ref, $prefix, $suffix) = @_;
+    #
+    # $prefix = "" if (!$prefix);
+    # $suffix = "" if (!$suffix);
+    # $suffix = "-$suffix" if ($suffix);
+    #
+    # if (ref($ref) eq "ARRAY") {
+    #     while (my ($key, $value) = each @{$ref}) {
+    #         TASMOTA::DEVICE::Expand($hash, $value, $prefix . sprintf("%02i", $key + 1) . "-", "");
+    #     }
+    # } elsif (ref($ref) eq "HASH") {
+    #     while (my ($key, $value) = each %{$ref}) {
+    #         if (ref($value)) {
+    #             TASMOTA::DEVICE::Expand($hash, $value, $prefix . $key . $suffix . "-", "");
+    #         } else {
+    #             # replace illegal characters in reading names
+    #             (my $reading = $prefix . $key . $suffix) =~ s/[^A-Za-z\d_\.\-\/]/_/g;
+    #             readingsBulkUpdate($hash, lc($reading), $value);
+    #         }
+    #     }
+    # }
 }
 
 sub Decode($$$) {
-    my ($hash, $reading, $value) = @_;
-    my $h;
-
-    eval {
-        $h = decode_json($value);
-        1;
-    };
-
-    if ($@) {
-        Log3($hash->{NAME}, 2, "bad JSON: $reading: $value - $@");
-        return undef;
-    }
-
-    readingsBeginUpdate($hash);
-    TASMOTA::DEVICE::Expand($hash, $h, $reading . "-", "");
-    readingsEndUpdate($hash, 1);
+    # my ($hash, $reading, $value) = @_;
+    # my $h;
+    #
+    # eval {
+    #     $h = decode_json($value);
+    #     1;
+    # };
+    #
+    # if ($@) {
+    #     Log3($hash->{NAME}, 2, "bad JSON: $reading: $value - $@");
+    #     return undef;
+    # }
+    #
+    # readingsBeginUpdate($hash);
+    # TASMOTA::DEVICE::Expand($hash, $h, $reading . "-", "");
+    # readingsEndUpdate($hash, 1);
 
     return undef;
 }
 
 1;
-
-=pod
-=item [device]
-=item summary TASMOTA_DEVICE acts as a fhem-device that is mapped to mqtt-topics of the custom tasmota firmware
-=begin html
-
-<a name="TASMOTA_DEVICE"></a>
-<h3>TASMOTA_DEVICE</h3>
-<ul>
-  <p>acts as a fhem-device that is mapped to <a href="http://mqtt.org/">mqtt</a>-topics.</p>
-  <p>requires a <a href="#MQTT">MQTT</a>-device as IODev<br/>
-     Note: this module is based on <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a> which needs to be installed from CPAN first.</p>
-  <a name="TASMOTA_DEVICEdefine"></a>
-  <p><b>Define</b></p>
-  <ul>
-    <p><code>define &lt;name&gt; TASMOTA_DEVICE &lt;topic&gt; [&lt;fullTopic&gt;]</code><br/>
-       Specifies the MQTT Tasmota device.</p>
-  </ul>
-  <a name="TASMOTA_DEVICEset"></a>
-  <p><b>Set</b></p>
-  <ul>
-    <li>
-      <p><code>set &lt;name&gt; &lt;command&gt;</code><br/>
-         sets reading 'state' and publishes the command to topic configured via attr publishSet</p>
-    </li>
-    <li>
-      <p><code>set &lt;name&gt; &lt;reading&gt; &lt;value&gt;</code><br/>
-         sets reading &lt;reading&gt; and publishes the command to topic configured via attr publishSet_&lt;reading&gt;</p>
-    </li>
-  </ul>
-  <a name="TASMOTA_DEVICEattr"></a>
-  <p><b>Attributes</b></p>
-  <ul>
-    <li>
-      <p><code>attr &lt;name&gt; publishSet [[&lt;reading&gt;:]&lt;commands_or_options&gt;] &lt;topic&gt;</code><br/>
-         configures set commands and UI-options e.g. 'slider' that may be used to both set given reading ('state' if not defined) and publish to configured topic</p>
-      <p>example:<br/>
-      <code>attr mqttest publishSet on off switch:on,off level:slider,0,1,100 /topic/123</code>
-      </p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; publishSet_&lt;reading&gt; [&lt;values&gt;]* &lt;topic&gt;</code><br/>
-         configures reading that may be used to both set 'reading' (to optionally configured values) and publish to configured topic</p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; autoSubscribeReadings &lt;topic&gt;</code><br/>
-         specify a mqtt-topic pattern with wildcard (e.c. 'myhouse/kitchen/+') and TASMOTA_DEVICE automagically creates readings based on the wildcard-match<br/>
-         e.g a message received with topic 'myhouse/kitchen/temperature' would create and update a reading 'temperature'</p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; subscribeReading_&lt;reading&gt; [{Perl-expression}] [qos:?] [retain:?] &lt;topic&gt;</code><br/>
-         mapps a reading to a specific topic. The reading is updated whenever a message to the configured topic arrives.<br/>
-         QOS and ratain can be optionally defined for this topic. <br/>
-         Furthermore, a Perl statement can be provided which is executed when the message is received. The following variables are available for the expression: $hash, $name, $topic, $message. Return value decides whether reading is set (true (e.g., 1) or undef) or discarded (false (e.g., 0)).
-         </p>
-      <p>Example:<br/>
-         <code>attr mqttest subscribeReading_cmd {fhem("set something off")} /topic/cmd</code>
-       </p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; retain &lt;flags&gt; ...</code><br/>
-         Specifies the retain flag for all or specific readings. Possible values are 0, 1</p>
-      <p>Examples:<br/>
-         <code>attr mqttest retain 0</code><br/>
-         defines retain 0 for all readings/topics (due to downward compatibility)<br>
-         <code> retain *:0 1 test:1</code><br/>
-         defines retain 0 for all readings/topics except the reading 'test'. Retain for 'test' is 1<br>
-       </p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; qos &lt;flags&gt; ...</code><br/>
-         Specifies the QOS flag for all or specific readings. Possible values are 0, 1 or 2. Constants may be also used: at-most-once = 0, at-least-once = 1, exactly-once = 2</p>
-      <p>Examples:<br/>
-         <code>attr mqttest qos 0</code><br/>
-         defines QOS 0 for all readings/topics (due to downward compatibility)<br>
-         <code> retain *:0 1 test:1</code><br/>
-         defines QOS 0 for all readings/topics except the reading 'test'. Retain for 'test' is 1<br>
-       </p>
-    </li>
-  </ul>
-</ul>
-
-=end html
-=cut
