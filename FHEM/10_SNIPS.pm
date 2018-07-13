@@ -155,12 +155,14 @@ sub onmessage($$$) {
     if ($topic =~ qr/^hermes\/intent\/$prefix:/) {
         # Remove MQTT path and prefix from intent
         (my $intent = $topic) =~ s/^hermes\/intent\/$prefix://;
+        Log3($hash->{NAME}, 1, "Intent: $intent");
+
         # Parse JSON from payload
         my $data = SNIPS::parse($hash, $intent, $message);
-    }
 
-    if ($intent eq 'SwitchOnOff') {
-
+        if ($intent eq 'SwitchOnOff') {
+            SNIPS::handleIntentOn($hash, $data);
+        }
     }
 }
 
@@ -206,10 +208,12 @@ sub checkData($$) {
     }
 }
 
+
 # Handle incoming "On" intent
-sub handleIntentOn {$$} {
+sub handleIntentOn ($$) {
     my ($hash, $data) = @_;
 
+    Log3($hash->{NAME}, 1, "handleIntentOn called");
 }
 
 1;
