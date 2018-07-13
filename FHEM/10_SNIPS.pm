@@ -25,7 +25,7 @@ sub SNIPS_Initialize($) {
     $hash->{UndefFn} = "SNIPS::Undefine";
     $hash->{SetFn} = "SNIPS::Set";
     $hash->{AttrFn} = "SNIPS::Attr";
-    $hash->{AttrList} = "IODev " . $main::readingFnAttributes;
+    $hash->{AttrList} = "IODev prefix defaultRoom " . $main::readingFnAttributes;
     $hash->{OnMessageFn} = "SNIPS::onmessage";
 
     main::LoadModule("MQTT");
@@ -44,6 +44,7 @@ BEGIN {
     MQTT->import(qw(:all));
 
     GP_Import(qw(
+        devspec2array
         CommandDeleteReading
         CommandAttr
         readingsSingleUpdate
@@ -134,18 +135,18 @@ sub Attr($$$$) {
         return undef;
     }
 
-    return "Error: Unhandled attribute";
+    return undef;
 }
 
 
-# Received data from the MQTT module
+# Empfangene Daten vom MQTT Modul
 sub onmessage($$$) {
     my ($hash, $topic, $message) = @_;
-    my $prefix = "Thyraz";
+    my $prefix = AttrVal($hash->{NAME},"prefix",undef);
 
     Log3($hash->{NAME}, 5, "received message '" . $message . "' for topic: " . $topic);
 
-    # Update readings
+    # Readings updaten
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "lastIntentTopic", $topic);
     readingsBulkUpdate($hash, "lastIntentPayload", $message);
@@ -153,11 +154,11 @@ sub onmessage($$$) {
 
     # hermes/intent published
     if ($topic =~ qr/^hermes\/intent\/$prefix:/) {
-        # Remove MQTT path and prefix from intent
+        # MQTT Pfad und Prefix vom Topic entfernen
         (my $intent = $topic) =~ s/^hermes\/intent\/$prefix://;
         Log3($hash->{NAME}, 1, "Intent: $intent");
 
-        # Parse JSON from payload
+        # JSON parsen
         my $data = SNIPS::parse($hash, $intent, $message);
 
         if ($intent eq 'SwitchOnOff') {
@@ -167,27 +168,27 @@ sub onmessage($$$) {
 }
 
 
-# Parse JSON
+# JSON parsen
 sub parse($$$) {
     my ($hash, $intent, $json) = @_;
     my $data;
 
-    # Decode JSON and check for errors
+    # JSON Decode und Fehlerüberprüfung
     my $decoded = eval { decode_json($json) };
     if ($@) {
           return undef;
     }
 
-    # Get always existing values
+    # Standard-Keys auslesen
     $data->{'probability'} = $decoded->{'intent'}{'probability'};
     $data->{'sessionId'} = $decoded->{'sessionId'};
     $data->{'siteId'} = $decoded->{'siteId'};
 
-    # Check if the slots array exists
+    # Überprüfen ob Slot Array existiert
     if (ref($decoded->{'slots'}) eq 'ARRAY') {
         my @slots = @{$decoded->{'slots'}};
 
-        # Collect key and value from each slot
+        # Key -> Value Paare aus dem Slot Array ziehen
         foreach my $slot (@slots) {
             my $slotName = $slot->{'slotName'};
             my $slotValue = $slot->{'value'}{'value'};
@@ -199,21 +200,63 @@ sub parse($$$) {
 }
 
 
-# Check the hash for the existance of all values in the array
-sub checkData($$) {
-    my ($hashRef, $arrayRef) = @_;
+# Eingehende "On" Intents bearbeiten
+sub handleIntentOn ($$) {
+    my ($hash, $data) = @_;
+    my $value, my $device, my $deviceName;
 
-    foreach my $key (@{$arrayRef}) {
+    if (exists($data->{'Device'}) && exists($data->{'Value'})) {
+        my $room = roomName($hash, $data);
+        Log3($hash->{NAME}, 5, "On-Intent: " . $room . " " . $data->{'Device'} . " " . $data->{'Value'});
 
+        $value = ($data->{'Value'} eq 'ein') ? "on" : "off";
+
+        $device = getDevice($hash, $room, $data->{'Device'});
+        $deviceName = $device->{NAME};
+        Log3($hash->{NAME}, 5, "Devicename: " . $deviceName);
+
+        fhem("set $deviceName $value");
     }
 }
 
 
-# Handle incoming "On" intent
-sub handleIntentOn ($$) {
-    my ($hash, $data) = @_;
+# Raum aus gesprochenem Text oder aus siteId verwenden? (siteId "default" durch Attr defaultRoom ersetzen)
+sub roomName ($$) {
+  my ($hash, $data) = @_;
 
-    Log3($hash->{NAME}, 1, "handleIntentOn called");
+  my $room;
+  my $defaultRoom = AttrVal($hash->{NAME},"defaultRoom","default");
+
+  if (exists($data->{'Room'})) {
+      $room = $data->{'Room'};
+  } else {
+      $room = $data->{'siteId'};
+      $room = $defaultRoom if ($room eq 'default' || !(length $room));
+  }
+
+  return $room;
+}
+
+
+# Gerät über Raum und Namen suchen
+sub getDevice($$$) {
+    my ($hash, $room, $name) = @_;
+    my $device;
+    my $devspec = "room=Snips";
+    my @devices = devspec2array($devspec);
+
+    # devspec2array sendet bei keinen Treffern als einziges Ergebnis den devSpec String zurück
+    return undef if (@devices == 1 && $devices[0] eq $devspec);
+
+    foreach (@devices) {
+        my $currentName = AttrVal($_,"snipsName",undef);
+        my $currentRoom = AttrVal($_,"snipsRoom",undef);
+
+        if ((lc($currentName) eq lc($name)) && (lc($currentRoom) eq lc($room))) {
+           $device = $defs{$_};
+        }
+    }
+    return $device;
 }
 
 1;
