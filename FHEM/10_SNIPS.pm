@@ -20,12 +20,16 @@ my @topics = qw(
 sub SNIPS_Initialize($) {
     my $hash = shift @_;
 
+    # Attribute snipsName und snipsRoom für andere Devices zur Verfügung abbestellen
+    addToAttrList("snipsName");
+    addToAttrList("snipsRoom");
+
     # Consumer
     $hash->{DefFn} = "SNIPS::Define";
     $hash->{UndefFn} = "SNIPS::Undefine";
     $hash->{SetFn} = "SNIPS::Set";
     $hash->{AttrFn} = "SNIPS::Attr";
-    $hash->{AttrList} = "IODev prefix defaultRoom " . $main::readingFnAttributes;
+    $hash->{AttrList} = "IODev defaultRoom " . $main::readingFnAttributes;
     $hash->{OnMessageFn} = "SNIPS::onmessage";
 
     main::LoadModule("MQTT");
@@ -66,15 +70,20 @@ sub Define() {
     my @args = split("[ \t]+", $def);
 
     # Minimale Anzahl der nötigen Argumente vorhanden?
-    return "Invalid number of arguments: define <name> SNIPS" if (int(@args) < 0);
+    return "Invalid number of arguments: define <name> SNIPS IODev Prefix" if (int(@args) < 4);
 
-    my ($name, $type) = @args;
-
+    my ($name, $type, $IODev, $prefix) = @args;
     $hash->{MODULE_VERSION} = "0.1";
-    $hash->{READY} = 0;
+    $hash->{helper}{prefix} = $prefix;
 
-    # Weitere Schritte an das MQTT Modul übergeben, damit man dort als Client registriert wird
-    return MQTT::Client_Define($hash, $def);
+    # IODev setzen und als MQTT Client registrieren
+    $main::attr{$name}{IODev} = $IODev;
+    MQTT::Client_Define($hash, $def);
+
+    # Benötigte MQTT Topics abonnieren
+    subscribeTopics($hash);
+
+    return undef;
 };
 
 
@@ -83,10 +92,7 @@ sub Undefine($$) {
     my ($hash, $name) = @_;
 
     # MQTT Abonnements löschen
-    foreach (@topics) {
-        client_unsubscribe_topic($hash, $_);
-        Log3($hash->{NAME}, 5, "Topic unsubscribed: " . $_);
-    }
+    unsubscribeTopics($hash);
 
     # Weitere Schritte an das MQTT Modul übergeben, damit man dort als Client ausgetragen wird
     return MQTT::Client_Undefine($hash);
@@ -96,25 +102,24 @@ sub Undefine($$) {
 # Set Befehl aufgerufen
 sub Set($$$@) {
     my ($hash, $name, $command, @values) = @_;
+    return "Unknown argument $command, choose one of " . join(" ", sort keys %sets) if(!defined($sets{$command}));
 
     Log3($hash->{NAME}, 5, "set " . $command . " - value: " . join (" ", @values));
 
-    if (defined($sets{$command})) {
-        my $msgid;
-        my $retain = $hash->{".retain"}->{'*'};
-        my $qos = $hash->{".qos"}->{'*'};
+    my $msgid;
+    my $retain = $hash->{".retain"}->{'*'};
+    my $qos = $hash->{".qos"}->{'*'};
 
-        # Say Befehl
-        if ($command eq "say") {
-            my $topic = "hermes/path/to/tts";
-            my $value = join (" ", @values);
+    # Say Befehl
+    if ($command eq "say") {
+        my $topic = "hermes/path/to/tts";
+        my $value = join (" ", @values);
 
-            $msgid = send_publish($hash->{IODev}, topic => $topic, message => $value, qos => $qos, retain => $retain);
-            Log3($hash->{NAME}, 5, "sent (tts) '" . $value . "' to " . $topic);
-        }
-
-        $hash->{message_ids}->{$msgid}++ if defined $msgid;
+        $msgid = send_publish($hash->{IODev}, topic => $topic, message => $value, qos => $qos, retain => $retain);
+        Log3($hash->{NAME}, 5, "sent (tts) '" . $value . "' to " . $topic);
     }
+
+    $hash->{message_ids}->{$msgid}++ if defined $msgid;
 }
 
 # Attribute setzen / löschen
@@ -124,14 +129,7 @@ sub Attr($$$$) {
 
     # IODev Attribut gesetzt
     if ($attribute eq "IODev") {
-        # Topics abonnieren
-        foreach (@topics) {
-            my ($mqos, $mretain, $mtopic, $mvalue, $mcmd) = MQTT::parsePublishCmdStr($_);
-            MQTT::client_subscribe_topic($hash,$mtopic,$mqos,$mretain);
 
-            Log3($hash->{NAME}, 5, "Topic subscribed: " . $_);
-        }
-        $hash->{READY} = 1;
         return undef;
     }
 
@@ -139,10 +137,35 @@ sub Attr($$$$) {
 }
 
 
+# Topics abonnieren
+sub subscribeTopics($) {
+    my ($hash) = @_;
+
+    foreach (@topics) {
+        my ($mqos, $mretain, $mtopic, $mvalue, $mcmd) = MQTT::parsePublishCmdStr($_);
+        MQTT::client_subscribe_topic($hash,$mtopic,$mqos,$mretain);
+
+        Log3($hash->{NAME}, 5, "Topic subscribed: " . $_);
+    }
+}
+
+# Topics abbestellen
+sub unsubscribeTopics($) {
+    my ($hash) = @_;
+
+    foreach (@topics) {
+        my ($mqos, $mretain, $mtopic, $mvalue, $mcmd) = MQTT::parsePublishCmdStr($_);
+        MQTT::client_unsubscribe_topic($hash,$mtopic);
+
+        Log3($hash->{NAME}, 5, "Topic unsubscribed: " . $_);
+    }
+}
+
+
 # Empfangene Daten vom MQTT Modul
 sub onmessage($$$) {
     my ($hash, $topic, $message) = @_;
-    my $prefix = AttrVal($hash->{NAME},"prefix",undef);
+    my $prefix = $hash->{helper}{prefix};
 
     Log3($hash->{NAME}, 5, "received message '" . $message . "' for topic: " . $topic);
 
@@ -159,44 +182,12 @@ sub onmessage($$$) {
         Log3($hash->{NAME}, 1, "Intent: $intent");
 
         # JSON parsen
-        my $data = SNIPS::parse($hash, $intent, $message);
+        my $data = SNIPS::parseJSON($hash, $intent, $message);
 
-        if ($intent eq 'SwitchOnOff') {
+        if ($intent eq 'On') {
             SNIPS::handleIntentOn($hash, $data);
         }
     }
-}
-
-
-# JSON parsen
-sub parse($$$) {
-    my ($hash, $intent, $json) = @_;
-    my $data;
-
-    # JSON Decode und Fehlerüberprüfung
-    my $decoded = eval { decode_json($json) };
-    if ($@) {
-          return undef;
-    }
-
-    # Standard-Keys auslesen
-    $data->{'probability'} = $decoded->{'intent'}{'probability'};
-    $data->{'sessionId'} = $decoded->{'sessionId'};
-    $data->{'siteId'} = $decoded->{'siteId'};
-
-    # Überprüfen ob Slot Array existiert
-    if (ref($decoded->{'slots'}) eq 'ARRAY') {
-        my @slots = @{$decoded->{'slots'}};
-
-        # Key -> Value Paare aus dem Slot Array ziehen
-        foreach my $slot (@slots) {
-            my $slotName = $slot->{'slotName'};
-            my $slotValue = $slot->{'value'}{'value'};
-
-            $data->{$slotName} = $slotValue;
-        }
-    }
-    return $data;
 }
 
 
@@ -204,18 +195,34 @@ sub parse($$$) {
 sub handleIntentOn ($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $deviceName;
+    my $retain, my $qos;
 
     if (exists($data->{'Device'}) && exists($data->{'Value'})) {
         my $room = roomName($hash, $data);
         Log3($hash->{NAME}, 5, "On-Intent: " . $room . " " . $data->{'Device'} . " " . $data->{'Value'});
 
         $value = ($data->{'Value'} eq 'ein') ? "on" : "off";
-
         $device = getDevice($hash, $room, $data->{'Device'});
-        $deviceName = $device->{NAME};
-        Log3($hash->{NAME}, 5, "Devicename: " . $deviceName);
 
-        fhem("set $deviceName $value");
+        if (defined($device)) {
+            $deviceName = $device->{NAME};
+
+            # AUSLAGERN: JSON Erstellung und Befehl senden (SendeBefehl der HashRef + Topic Pfad entgegen nimmt JSON Encoding + Senden übernimmt)
+
+            my $sendData =  {
+                sessionId => $data->{sessionId},
+                text => "ok"
+            };
+
+            my $json = SNIPS::encodeJSON($sendData);
+            Log3($hash->{NAME}, 5, "SendData: " . $json);
+
+            $retain = $hash->{".retain"}->{'*'};
+            $qos = $hash->{".qos"}->{'*'};
+            MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => $qos, retain => $retain);
+
+            fhem("set $deviceName $value");
+        }
     }
 }
 
@@ -249,14 +256,64 @@ sub getDevice($$$) {
     return undef if (@devices == 1 && $devices[0] eq $devspec);
 
     foreach (@devices) {
-        my $currentName = AttrVal($_,"snipsName",undef);
-        my $currentRoom = AttrVal($_,"snipsRoom",undef);
+        # 2 Arrays bilden mit Namen und Räumen des Devices
+        my @names = ($_, AttrVal($_,"alias",undef), AttrVal($_,"snipsName",undef));
+        my @rooms = split(',', AttrVal($_,"room",undef));
+        push (@rooms, AttrVal($_,"snipsRoom",undef));
 
-        if ((lc($currentName) eq lc($name)) && (lc($currentRoom) eq lc($room))) {
+        # Case Insensitive schauen ob der gesuchte Name und Raum in den Arrays vorhanden ist
+        if (grep( /^$name$/i, @names) && grep( /^$room$/i, @rooms)) {
            $device = $defs{$_};
         }
     }
     return $device;
+}
+
+
+# JSON parsen
+sub parseJSON($$$) {
+    my ($hash, $intent, $json) = @_;
+    my $data;
+
+    # JSON Decode und Fehlerüberprüfung
+    my $decoded = eval { decode_json($json) };
+    if ($@) {
+          return undef;
+    }
+
+    # Standard-Keys auslesen
+    $data->{'probability'} = $decoded->{'intent'}{'probability'};
+    $data->{'sessionId'} = $decoded->{'sessionId'};
+    $data->{'siteId'} = $decoded->{'siteId'};
+
+    # Überprüfen ob Slot Array existiert
+    if (ref($decoded->{'slots'}) eq 'ARRAY') {
+        my @slots = @{$decoded->{'slots'}};
+
+        # Key -> Value Paare aus dem Slot Array ziehen
+        foreach my $slot (@slots) {
+            my $slotName = $slot->{'slotName'};
+            my $slotValue = $slot->{'value'}{'value'};
+
+            $data->{$slotName} = $slotValue;
+        }
+    }
+    return $data;
+}
+
+
+# HashRef zu JSON ecnoden
+sub encodeJSON($) {
+    my ($hashRef) = @_;
+    my $json;
+
+    # JSON Encode und Fehlerüberprüfung
+    my $json = eval { encode_json($hashRef) };
+    if ($@) {
+          return undef;
+    }
+
+    return $json;
 }
 
 1;
