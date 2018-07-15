@@ -23,6 +23,7 @@ sub SNIPS_Initialize($) {
     # Attribute snipsName und snipsRoom für andere Devices zur Verfügung abbestellen
     addToAttrList("snipsName");
     addToAttrList("snipsRoom");
+    addToAttrList("snipsMapping");
 
     # Consumer
     $hash->{DefFn} = "SNIPS::Define";
@@ -179,49 +180,15 @@ sub onmessage($$$) {
     if ($topic =~ qr/^hermes\/intent\/$prefix:/) {
         # MQTT Pfad und Prefix vom Topic entfernen
         (my $intent = $topic) =~ s/^hermes\/intent\/$prefix://;
-        Log3($hash->{NAME}, 1, "Intent: $intent");
+        Log3($hash->{NAME}, 5, "Intent: $intent");
 
         # JSON parsen
         my $data = SNIPS::parseJSON($hash, $intent, $message);
 
         if ($intent eq 'On') {
             SNIPS::handleIntentOn($hash, $data);
-        }
-    }
-}
-
-
-# Eingehende "On" Intents bearbeiten
-sub handleIntentOn ($$) {
-    my ($hash, $data) = @_;
-    my $value, my $device, my $deviceName;
-    my $retain, my $qos;
-
-    if (exists($data->{'Device'}) && exists($data->{'Value'})) {
-        my $room = roomName($hash, $data);
-        Log3($hash->{NAME}, 5, "On-Intent: " . $room . " " . $data->{'Device'} . " " . $data->{'Value'});
-
-        $value = ($data->{'Value'} eq 'ein') ? "on" : "off";
-        $device = getDevice($hash, $room, $data->{'Device'});
-
-        if (defined($device)) {
-            $deviceName = $device->{NAME};
-
-            # AUSLAGERN: JSON Erstellung und Befehl senden (SendeBefehl der HashRef + Topic Pfad entgegen nimmt JSON Encoding + Senden übernimmt)
-
-            my $sendData =  {
-                sessionId => $data->{sessionId},
-                text => "ok"
-            };
-
-            my $json = SNIPS::encodeJSON($sendData);
-            Log3($hash->{NAME}, 5, "SendData: " . $json);
-
-            $retain = $hash->{".retain"}->{'*'};
-            $qos = $hash->{".qos"}->{'*'};
-            MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => $qos, retain => $retain);
-
-            fhem("set $deviceName $value");
+        } elsif ($intent eq 'Percent') {
+            SNIPS::handleIntentPercent($hash, $data);
         }
     }
 }
@@ -234,6 +201,7 @@ sub roomName ($$) {
   my $room;
   my $defaultRoom = AttrVal($hash->{NAME},"defaultRoom","default");
 
+  # Slot "Room" im JSON vorhanden? Sonst Raum des angesprochenen Satelites verwenden
   if (exists($data->{'Room'})) {
       $room = $data->{'Room'};
   } else {
@@ -314,6 +282,64 @@ sub encodeJSON($) {
     }
 
     return $json;
+}
+
+
+# Eingehende "On" Intents bearbeiten
+sub handleIntentOn ($$) {
+    my ($hash, $data) = @_;
+    my $value, my $device, my $room;
+    my $deviceName;
+    my $sendData, my $json;
+
+    if (exists($data->{'Device'}) && exists($data->{'Value'})) {
+        $room = roomName($hash, $data);
+        $value = ($data->{'Value'} eq 'ein') ? "on" : "off";
+        $device = getDevice($hash, $room, $data->{'Device'});
+        $deviceName = $device->{NAME} if (defined($device));
+
+        Log3($hash->{NAME}, 5, "On-Intent: " . $room . " " . $deviceName . " " . $value);
+
+        if (defined($device)) {
+            # Antwort erstellen und Senden
+            $sendData =  {
+                sessionId => $data->{sessionId},
+                text => "ok"
+            };
+
+            $json = SNIPS::encodeJSON($sendData);
+            MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+            fhem("set $deviceName $value");
+
+            Log3($hash->{NAME}, 5, "SendData: " . $json);
+        }
+    }
+}
+
+# Eingehende "Percent" Intents bearbeiten
+sub handleIntentPercent ($$) {
+    my ($hash, $data) = @_;
+    my $value, my $device, my $room, my $change;
+    my $deviceName;
+    my $sendData, my $json;
+    my $validData = 0;
+
+    Log3($hash->{NAME}, 5, "Device: " . $data->{'Device'} . " Value: " . $data->{'Value'});
+
+    # Mindestens Device und Value angegeben -> Valid (z.B. Deckenlampe auf 20%)
+    $validData = 1 if (exists($data->{'Device'}) && exists($data->{'Value'}));
+    # Mindestens Device und Change angegeben -> Valid (z.B. Radio lauter)
+    $validData = 1 if (exists($data->{'Device'}) && exists($data->{'Change'}));
+
+    if ($validData == 1) {
+
+        $room = roomName($hash, $data);
+        $value = $data->{'Value'};
+        $value = $data->{'Change'};
+        $device = getDevice($hash, $room, $data->{'Device'});
+
+        Log3($hash->{NAME}, 5, "Precent-Intent: " . $room . " " . $device . " " . $value . " " . $change);
+    }
 }
 
 1;
