@@ -23,7 +23,7 @@ sub SNIPS_Initialize($) {
     # Attribute snipsName und snipsRoom für andere Devices zur Verfügung abbestellen
     addToAttrList("snipsName");
     addToAttrList("snipsRoom");
-    addToAttrList("snipsMapping");
+    addToAttrList("snipsMapping:textField-long");
 
     # Consumer
     $hash->{DefFn} = "SNIPS::Define";
@@ -200,7 +200,7 @@ sub getDevice($$$) {
 
         # Case Insensitive schauen ob der gesuchte Name und Raum in den Arrays vorhanden ist
         if (grep( /^$name$/i, @names) && grep( /^$room$/i, @rooms)) {
-           $device = $defs{$_};
+           $device = $_;
         }
     }
     return $device;
@@ -208,13 +208,13 @@ sub getDevice($$$) {
 
 
 # snipsMapping parsen und gefundene Settings zurückliefern
-sub getMapping($$$$)
+sub getMapping($$$$) {
     my ($hash, $device, $intent, $type) = @_;
-    my $mapping;
-    my $mappingsString = AttrVal($hash->{$device},"snipsMapping",undef);
+    my @mappings, my $mapping;
+    my $mappingsString = AttrVal($device,"snipsMapping",undef);
 
     # String in einzelne Mappings teilen
-    my @mappings = split(/\n/, $mappingString);
+    @mappings = split(/\n/, $mappingsString);
 
     foreach (@mappings) {
         # Nur Mappings vom gesuchten Typ verwenden
@@ -222,6 +222,8 @@ sub getMapping($$$$)
         my %hash = split(/[,=]/, $_);
         if (!defined($mapping) || (defined($type) && $hash{'type'} eq $type)) {
             $mapping = \%hash;
+
+            Log3($hash->{NAME}, 5, "snipsMapping selected: $_");
         }
     }
 
@@ -298,10 +300,10 @@ sub onmessage($$$) {
         # JSON parsen
         my $data = SNIPS::parseJSON($hash, $intent, $message);
 
-        if ($intent eq 'On') {
-            SNIPS::handleIntentOn($hash, $data);
-        } elsif ($intent eq 'Percent') {
-            SNIPS::handleIntentPercent($hash, $data);
+        if ($intent eq 'SetOnOff') {
+            SNIPS::handleIntentSetOnOff($hash, $data);
+        } elsif ($intent eq 'SetNumeric') {
+            SNIPS::handleIntentSetNumeric($hash, $data);
         }
     }
 }
@@ -314,13 +316,14 @@ sub handleIntentSetOnOff($$) {
     my $deviceName;
     my $sendData, my $json;
 
+    Log3($hash->{NAME}, 5, "handleIntentSetOnOff called");
+
     if (exists($data->{'Device'}) && exists($data->{'Value'})) {
         $room = roomName($hash, $data);
         $value = ($data->{'Value'} eq 'an') ? "on" : "off";
         $device = getDevice($hash, $room, $data->{'Device'});
-        $deviceName = $device->{NAME} if (defined($device));
 
-        Log3($hash->{NAME}, 5, "On-Intent: " . $room . " " . $deviceName . " " . $value);
+        Log3($hash->{NAME}, 5, "SetOnOff-Intent: " . $room . " " . $device . " " . $value);
 
         if (defined($device)) {
             # Antwort erstellen und Senden
@@ -331,23 +334,23 @@ sub handleIntentSetOnOff($$) {
 
             $json = SNIPS::encodeJSON($sendData);
             MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
-            fhem("set $deviceName $value");
+            fhem("set $device $value");
 
             Log3($hash->{NAME}, 5, "SendData: " . $json);
         }
     }
 }
 
+
 # Eingehende "SetNumeric" Intents bearbeiten
 sub handleIntentSetNumeric($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room, my $change, my $type;
-    my $deviceName;
     my $mapping;
     my $sendData, my $json;
     my $validData = 0;
 
-    Log3($hash->{NAME}, 5, "Device: " . $data->{'Device'} . " Value: " . $data->{'Value'});
+    Log3($hash->{NAME}, 5, "handleIntentSetNumeric called");
 
     # Mindestens Device und Value angegeben -> Valid (z.B. Deckenlampe auf 20%)
     $validData = 1 if (exists($data->{'Device'}) && exists($data->{'Value'}));
@@ -355,7 +358,6 @@ sub handleIntentSetNumeric($$) {
     $validData = 1 if (exists($data->{'Device'}) && exists($data->{'Change'}));
 
     if ($validData == 1) {
-
         $type = $data->{'Type'};
         $value = $data->{'Value'};
         $change = $data->{'Change'};
@@ -363,10 +365,30 @@ sub handleIntentSetNumeric($$) {
         $device = getDevice($hash, $room, $data->{'Device'});
         $mapping = getMapping($hash, $device, "SetNumeric", $type);
 
-        Log3($hash->{NAME}, 5, "Precent-Intent: " . $room . " " . $device . " " . $value . " " . $change);
+        Log3($hash->{NAME}, 5, "SetNumeric-Intent: " . ($room //= '') . " " . ($device //= '') . " " . ($value //= '') . " " . ($change //= '') . " " . ($type //= ''));
 
-        if (defined($device) && defined($mapping)) {
-            
+        # Mapping und Gerät gefunden -> Befehl ausführen
+        if (defined($device) && defined($mapping) && defined($mapping->{'cmd'})) {
+            my $normalizedVal;
+            my $cmd = $mapping->{'cmd'};
+            my $minVal = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} :   0;
+            my $maxVal = (defined($mapping->{'maxVal'})) ? $mapping->{'maxVal'} : 100;
+            my $step   = (defined($mapping->{'step'}))   ? $mapping->{'step'}   :  10;
+
+            # Antwort erstellen
+            $sendData =  {
+                sessionId => $data->{sessionId},
+                text => "ok"
+            };
+
+            $json = SNIPS::encodeJSON($sendData);
+            MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+
+            # Befehl an Gerät senden
+            if (defined($value)) {
+                $normalizedVal = $value * ($maxVal/100);
+                fhem("set $device $cmd $value");
+            }
         }
     }
 }
