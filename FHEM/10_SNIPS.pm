@@ -163,37 +163,6 @@ sub unsubscribeTopics($) {
 }
 
 
-# Empfangene Daten vom MQTT Modul
-sub onmessage($$$) {
-    my ($hash, $topic, $message) = @_;
-    my $prefix = $hash->{helper}{prefix};
-
-    Log3($hash->{NAME}, 5, "received message '" . $message . "' for topic: " . $topic);
-
-    # Readings updaten
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, "lastIntentTopic", $topic);
-    readingsBulkUpdate($hash, "lastIntentPayload", $message);
-    readingsEndUpdate($hash, 1);
-
-    # hermes/intent published
-    if ($topic =~ qr/^hermes\/intent\/$prefix:/) {
-        # MQTT Pfad und Prefix vom Topic entfernen
-        (my $intent = $topic) =~ s/^hermes\/intent\/$prefix://;
-        Log3($hash->{NAME}, 5, "Intent: $intent");
-
-        # JSON parsen
-        my $data = SNIPS::parseJSON($hash, $intent, $message);
-
-        if ($intent eq 'On') {
-            SNIPS::handleIntentOn($hash, $data);
-        } elsif ($intent eq 'Percent') {
-            SNIPS::handleIntentPercent($hash, $data);
-        }
-    }
-}
-
-
 # Raum aus gesprochenem Text oder aus siteId verwenden? (siteId "default" durch Attr defaultRoom ersetzen)
 sub roomName ($$) {
   my ($hash, $data) = @_;
@@ -235,6 +204,28 @@ sub getDevice($$$) {
         }
     }
     return $device;
+}
+
+
+# snipsMapping parsen und gefundene Settings zurückliefern
+sub getMapping($$$$)
+    my ($hash, $device, $intent, $type) = @_;
+    my $mapping;
+    my $mappingsString = AttrVal($hash->{$device},"snipsMapping",undef);
+
+    # String in einzelne Mappings teilen
+    my @mappings = split(/\n/, $mappingString);
+
+    foreach (@mappings) {
+        # Nur Mappings vom gesuchten Typ verwenden
+        next unless $_ =~ qr/^$intent/;
+        my %hash = split(/[,=]/, $_);
+        if (!defined($mapping) || (defined($type) && $hash{'type'} eq $type)) {
+            $mapping = \%hash;
+        }
+    }
+
+    return $mapping;
 }
 
 
@@ -285,8 +276,39 @@ sub encodeJSON($) {
 }
 
 
-# Eingehende "On" Intents bearbeiten
-sub handleIntentOn ($$) {
+# Empfangene Daten vom MQTT Modul
+sub onmessage($$$) {
+    my ($hash, $topic, $message) = @_;
+    my $prefix = $hash->{helper}{prefix};
+
+    Log3($hash->{NAME}, 5, "received message '" . $message . "' for topic: " . $topic);
+
+    # Readings updaten
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "lastIntentTopic", $topic);
+    readingsBulkUpdate($hash, "lastIntentPayload", $message);
+    readingsEndUpdate($hash, 1);
+
+    # hermes/intent published
+    if ($topic =~ qr/^hermes\/intent\/$prefix:/) {
+        # MQTT Pfad und Prefix vom Topic entfernen
+        (my $intent = $topic) =~ s/^hermes\/intent\/$prefix://;
+        Log3($hash->{NAME}, 5, "Intent: $intent");
+
+        # JSON parsen
+        my $data = SNIPS::parseJSON($hash, $intent, $message);
+
+        if ($intent eq 'On') {
+            SNIPS::handleIntentOn($hash, $data);
+        } elsif ($intent eq 'Percent') {
+            SNIPS::handleIntentPercent($hash, $data);
+        }
+    }
+}
+
+
+# Eingehende "SetOnOff" Intents bearbeiten
+sub handleIntentSetOnOff($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room;
     my $deviceName;
@@ -294,7 +316,7 @@ sub handleIntentOn ($$) {
 
     if (exists($data->{'Device'}) && exists($data->{'Value'})) {
         $room = roomName($hash, $data);
-        $value = ($data->{'Value'} eq 'ein') ? "on" : "off";
+        $value = ($data->{'Value'} eq 'an') ? "on" : "off";
         $device = getDevice($hash, $room, $data->{'Device'});
         $deviceName = $device->{NAME} if (defined($device));
 
@@ -316,11 +338,12 @@ sub handleIntentOn ($$) {
     }
 }
 
-# Eingehende "Percent" Intents bearbeiten
-sub handleIntentPercent ($$) {
+# Eingehende "SetNumeric" Intents bearbeiten
+sub handleIntentSetNumeric($$) {
     my ($hash, $data) = @_;
-    my $value, my $device, my $room, my $change;
+    my $value, my $device, my $room, my $change, my $type;
     my $deviceName;
+    my $mapping;
     my $sendData, my $json;
     my $validData = 0;
 
@@ -333,12 +356,18 @@ sub handleIntentPercent ($$) {
 
     if ($validData == 1) {
 
-        $room = roomName($hash, $data);
+        $type = $data->{'Type'};
         $value = $data->{'Value'};
-        $value = $data->{'Change'};
+        $change = $data->{'Change'};
+        $room = roomName($hash, $data);
         $device = getDevice($hash, $room, $data->{'Device'});
+        $mapping = getMapping($hash, $device, "SetNumeric", $type);
 
         Log3($hash->{NAME}, 5, "Precent-Intent: " . $room . " " . $device . " " . $value . " " . $change);
+
+        if (defined($device) && defined($mapping)) {
+            
+        }
     }
 }
 
