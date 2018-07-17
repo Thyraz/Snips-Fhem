@@ -369,11 +369,10 @@ sub handleIntentSetNumeric($$) {
 
         # Mapping und Gerät gefunden -> Befehl ausführen
         if (defined($device) && defined($mapping) && defined($mapping->{'cmd'})) {
-            my $normalizedVal;
             my $cmd = $mapping->{'cmd'};
-            my $minVal = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} :   0;
-            my $maxVal = (defined($mapping->{'maxVal'})) ? $mapping->{'maxVal'} : 100;
-            my $step   = (defined($mapping->{'step'}))   ? $mapping->{'step'}   :  10;
+            my $minVal = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : undef;
+            my $maxVal = (defined($mapping->{'maxVal'})) ? $mapping->{'maxVal'} : undef;
+            my $step   = (defined($value)) ? $value : ((defined($mapping->{'step'})) ? $mapping->{'step'} : 10);
 
             # Antwort erstellen
             $sendData =  {
@@ -385,9 +384,16 @@ sub handleIntentSetNumeric($$) {
             MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
 
             # Befehl an Gerät senden
-            if (defined($value)) {
-                $normalizedVal = $value * ($maxVal/100);
-                fhem("set $device $cmd $value");
+            if (defined($value) && !defined($change)) {
+                my $normalizedVal = (defined($minVal) && defined($maxVal)) ? $value * ($maxVal/100) : $value;
+                fhem("set $device $cmd $normalizedVal");
+            } elsif (defined($change)) {
+                my $reading = $mapping->{'SetNumeric'});
+                my $oldVal = AttrVal($device, $reading, undef);
+                if (defined($oldVal)) {
+                    my $newVal = ($change ~= m/^(rauf|heller|lauter)$/) ? $oldVal + $step : $oldVal - $step;
+                    fhem("set $device $cmd $newVal");
+                }
             }
         }
     }
