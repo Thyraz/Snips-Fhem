@@ -61,6 +61,7 @@ BEGIN {
         defs
         AttrVal
         ReadingsVal
+        round
     ))
 };
 
@@ -198,9 +199,11 @@ sub getDevice($$$) {
         my @rooms = split(',', AttrVal($_,"room",undef));
         push (@rooms, AttrVal($_,"snipsRoom",undef));
 
-        # Case Insensitive schauen ob der gesuchte Name und Raum in den Arrays vorhanden ist
-        if (grep( /^$name$/i, @names) && grep( /^$room$/i, @rooms)) {
-           $device = $_;
+        # Case Insensitive schauen ob der gesuchte Name (oder besser Name und Raum) in den Arrays vorhanden ist
+        if (grep( /^$name$/i, @names)) {
+            if (!defined($device) || grep( /^$room$/i, @rooms)) {
+                $device = $_;
+            }
         }
     }
     return $device;
@@ -365,7 +368,7 @@ sub handleIntentSetNumeric($$) {
         $device = getDevice($hash, $room, $data->{'Device'});
         $mapping = getMapping($hash, $device, "SetNumeric", $type);
 
-        Log3($hash->{NAME}, 5, "SetNumeric-Intent: " . ($room //= '') . " " . ($device //= '') . " " . ($value //= '') . " " . ($change //= '') . " " . ($type //= ''));
+        Log3($hash->{NAME}, 5, "SetNumeric-Intent: " . $room . " " . $device . " " . $value . " " . $change . " " . $type);
 
         # Mapping und Gerät gefunden -> Befehl ausführen
         if (defined($device) && defined($mapping) && defined($mapping->{'cmd'})) {
@@ -385,13 +388,17 @@ sub handleIntentSetNumeric($$) {
 
             # Befehl an Gerät senden
             if (defined($value) && !defined($change)) {
-                my $normalizedVal = (defined($minVal) && defined($maxVal)) ? $value * ($maxVal/100) : $value;
+                my $normalizedVal = (defined($minVal) && defined($maxVal)) ? main::round($value * ($maxVal/100), 0) : $value;
                 fhem("set $device $cmd $normalizedVal");
             } elsif (defined($change)) {
-                my $reading = $mapping->{'SetNumeric'});
-                my $oldVal = AttrVal($device, $reading, undef);
+                my $reading = $mapping->{'SetNumeric'};
+                Log3($hash->{NAME}, 5, "reading: $reading");
+                my $oldVal = ReadingsVal($device, $reading, undef);
+                Log3($hash->{NAME}, 5, "oldVal: $oldVal");
                 if (defined($oldVal)) {
-                    my $newVal = ($change ~= m/^(rauf|heller|lauter)$/) ? $oldVal + $step : $oldVal - $step;
+# TODO: NewVal begrenzen auf minVal/maxVal falls gesetzt, sonst 0..100
+                    my $newVal = ($change =~ m/^(rauf|heller|lauter)$/) ? $oldVal + $step : $oldVal - $step;
+                    Log3($hash->{NAME}, 5, "newVal: $newVal");
                     fhem("set $device $cmd $newVal");
                 }
             }
