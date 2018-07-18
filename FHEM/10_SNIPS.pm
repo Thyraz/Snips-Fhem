@@ -305,8 +305,12 @@ sub onmessage($$$) {
 
         if ($intent eq 'SetOnOff') {
             SNIPS::handleIntentSetOnOff($hash, $data);
+        } elsif ($intent eq 'GetOnOff') {
+            SNIPS::handleIntentGetOnOff($hash, $data);
         } elsif ($intent eq 'SetNumeric') {
             SNIPS::handleIntentSetNumeric($hash, $data);
+        } elsif ($intent eq 'GetNumeric') {
+            SNIPS::handleIntentGetNumeric($hash, $data);
         }
     }
 }
@@ -316,20 +320,27 @@ sub onmessage($$$) {
 sub handleIntentSetOnOff($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room;
+    my $mapping;
     my $deviceName;
     my $sendData, my $json;
-    my $response = "Da ging etwas schief.";
+    my $response = "Da ist etwas schief gegeangen.";
 
     Log3($hash->{NAME}, 5, "handleIntentSetOnOff called");
 
     if (exists($data->{'Device'}) && exists($data->{'Value'})) {
         $room = roomName($hash, $data);
-        $value = ($data->{'Value'} eq 'an') ? "on" : "off";
+        $value = $data->{'Value'};
         $device = getDevice($hash, $room, $data->{'Device'});
+        $mapping = getMapping($hash, $device, "SetOnOff", undef);
 
         Log3($hash->{NAME}, 5, "SetOnOff-Intent: " . $room . " " . $device . " " . $value);
 
-        if (defined($device)) {
+        if (defined($device) && defined($mapping)) {
+            my $cmdOn  = (defined($mapping->{'cmdOn'}))  ? $mapping->{'cmdOn'}  :  "on";
+            my $cmdOff = (defined($mapping->{'cmdOff'})) ? $mapping->{'cmdOff'} : "off";
+            $value = ($value eq 'an') ? $cmdOn : $cmdOff;
+
+            $response = "Ok";
             # Gerät schalten
             fhem("set $device $value");
         }
@@ -337,7 +348,39 @@ sub handleIntentSetOnOff($$) {
     # Antwort erstellen und Senden
     $sendData =  {
         sessionId => $data->{sessionId},
-        text => "ok"
+        text => $response
+    };
+
+    $json = SNIPS::encodeJSON($sendData);
+    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+}
+
+
+# Eingehende "GetOnOff" Intents bearbeiten
+sub handleIntentGetOnOff($$) {
+    my ($hash, $data) = @_;
+    my $value, my $device, my $room, my $status;
+    my $mapping;
+    my $deviceName;
+    my $sendData, my $json;
+    my $response = "Da ist etwas schief gegeangen.";
+
+    Log3($hash->{NAME}, 5, "handleIntentGetOnOff called");
+
+    if (exists($data->{'Device'}) && exists($data->{'Status'})) {
+        $room = roomName($hash, $data);
+        $device = getDevice($hash, $room, $data->{'Device'});
+        $mapping = getMapping($hash, $device, "GetOnOff", undef);
+
+        if (defined($device) && defined($mapping)) {
+
+        }
+    }
+
+    # Antwort erstellen und Senden
+    $sendData =  {
+        sessionId => $data->{sessionId},
+        text => $response
     };
 
     $json = SNIPS::encodeJSON($sendData);
@@ -352,7 +395,7 @@ sub handleIntentSetNumeric($$) {
     my $mapping;
     my $sendData, my $json;
     my $validData = 0;
-    my $response = "Da ging etwas schief.";
+    my $response = "Da ist etwas schief gegeangen.";
 
     Log3($hash->{NAME}, 5, "handleIntentSetNumeric called");
 
@@ -400,7 +443,7 @@ sub handleIntentSetNumeric($$) {
                 $newVal = $value;
                 $newVal =   0 if ($newVal <   0);
                 $newVal = 100 if ($newVal > 100);
-                $newVal = main::round(($newVal * (($maxVal - $minVal) / 100)) + $minVal), 0);
+                $newVal = main::round((($newVal * (($maxVal - $minVal) / 100)) + $minVal), 0);
                 $response = "Ok";
             }
             # Stellwert um Wert x ändern
@@ -412,8 +455,8 @@ sub handleIntentSetNumeric($$) {
             }
             # Stellwert um Prozent x ändern
             elsif (defined($change) && $isPercent && defined($minVal) && defined($maxVal)) {
-                my $diffRaw = main::round(($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
-                $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw
+                my $diffRaw = main::round((($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
+                $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw;
                 $newVal = $minVal if ($newVal < $minVal);
                 $newVal = $maxVal if ($newVal > $maxVal);
                 $response = "Ok";
