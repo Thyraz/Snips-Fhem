@@ -318,6 +318,7 @@ sub handleIntentSetOnOff($$) {
     my $value, my $device, my $room;
     my $deviceName;
     my $sendData, my $json;
+    my $response = "Da ging etwas schief.";
 
     Log3($hash->{NAME}, 5, "handleIntentSetOnOff called");
 
@@ -329,29 +330,29 @@ sub handleIntentSetOnOff($$) {
         Log3($hash->{NAME}, 5, "SetOnOff-Intent: " . $room . " " . $device . " " . $value);
 
         if (defined($device)) {
-            # Antwort erstellen und Senden
-            $sendData =  {
-                sessionId => $data->{sessionId},
-                text => "ok"
-            };
-
-            $json = SNIPS::encodeJSON($sendData);
-            MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+            # Gerät schalten
             fhem("set $device $value");
-
-            Log3($hash->{NAME}, 5, "SendData: " . $json);
         }
     }
+    # Antwort erstellen und Senden
+    $sendData =  {
+        sessionId => $data->{sessionId},
+        text => "ok"
+    };
+
+    $json = SNIPS::encodeJSON($sendData);
+    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
 }
 
 
 # Eingehende "SetNumeric" Intents bearbeiten
 sub handleIntentSetNumeric($$) {
     my ($hash, $data) = @_;
-    my $value, my $device, my $room, my $change, my $type;
+    my $value, my $device, my $room, my $change, my $type, my $unit;
     my $mapping;
     my $sendData, my $json;
     my $validData = 0;
+    my $response = "Da ging etwas schief.";
 
     Log3($hash->{NAME}, 5, "handleIntentSetNumeric called");
 
@@ -361,6 +362,7 @@ sub handleIntentSetNumeric($$) {
     $validData = 1 if (exists($data->{'Device'}) && exists($data->{'Change'}));
 
     if ($validData == 1) {
+        $type = $data->{'Unit'};
         $type = $data->{'Type'};
         $value = $data->{'Value'};
         $change = $data->{'Change'};
@@ -372,37 +374,77 @@ sub handleIntentSetNumeric($$) {
 
         # Mapping und Gerät gefunden -> Befehl ausführen
         if (defined($device) && defined($mapping) && defined($mapping->{'cmd'})) {
-            my $cmd = $mapping->{'cmd'};
-            my $minVal = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : undef;
-            my $maxVal = (defined($mapping->{'maxVal'})) ? $mapping->{'maxVal'} : undef;
-            my $step   = (defined($value)) ? $value : ((defined($mapping->{'step'})) ? $mapping->{'step'} : 10);
+            my $cmd     = $mapping->{'cmd'};
+            my $reading = $mapping->{'SetNumeric'};
+            my $minVal  = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : 0; # Snips kann keine negativen Nummern bisher, daher erzwungener minVal
+            my $maxVal  = (defined($mapping->{'maxVal'})) ? $mapping->{'maxVal'} : undef;
+            my $oldVal  = ReadingsVal($device, $reading, 0);
+            my $diff    = (defined($value)) ? $value : ((defined($mapping->{'step'})) ? $mapping->{'step'} : 10);
+            my $up      = (defined($change) && ($change =~ m/^(rauf|heller|lauter)$/)) ? 1 : 0;
+            my $isPercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "limits") ? 1 : 0;
 
-            # Antwort erstellen
-            $sendData =  {
-                sessionId => $data->{sessionId},
-                text => "ok"
-            };
+            # Neuen Stellwert bestimmen
+            my $newVal;
 
-            $json = SNIPS::encodeJSON($sendData);
-            MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
-
-            # Befehl an Gerät senden
-            if (defined($value) && !defined($change)) {
-                my $normalizedVal = (defined($minVal) && defined($maxVal)) ? main::round($value * ($maxVal/100), 0) : $value;
-                fhem("set $device $cmd $normalizedVal");
-            } elsif (defined($change)) {
-                my $reading = $mapping->{'SetNumeric'};
-                Log3($hash->{NAME}, 5, "reading: $reading");
-                my $oldVal = ReadingsVal($device, $reading, undef);
-                Log3($hash->{NAME}, 5, "oldVal: $oldVal");
-                if (defined($oldVal)) {
-# TODO: NewVal begrenzen auf minVal/maxVal falls gesetzt, sonst 0..100
-                    my $newVal = ($change =~ m/^(rauf|heller|lauter)$/) ? $oldVal + $step : $oldVal - $step;
-                    Log3($hash->{NAME}, 5, "newVal: $newVal");
-                    fhem("set $device $cmd $newVal");
-                }
+            # Direkter Stellwert
+            if (defined($value) && !defined($change) && !$isPercent) {
+                $newVal = $value;
+                # Begrenzung auf evtl. gesetzte min/max Werte
+                $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
+                $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
+                $response = "Ok";
             }
+            # Direkter Stellwert als Prozent
+            elsif (defined($value) && !defined($change) && $isPercent && defined($minVal) && defined($maxVal)) {
+                # Wert von Prozent in Raw-Wert umrechnen
+                $newVal = $value;
+                $newVal =   0 if ($newVal <   0);
+                $newVal = 100 if ($newVal > 100);
+                $newVal = main::round(($newVal * (($maxVal - $minVal) / 100)) + $minVal), 0);
+                $response = "Ok";
+            }
+            # Stellwert um Wert x ändern
+            elsif (defined($change) && !$isPercent) {
+                $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
+                $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
+                $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
+                $response = "Ok";
+            }
+            # Stellwert um Prozent x ändern
+            elsif (defined($change) && $isPercent && defined($minVal) && defined($maxVal)) {
+                my $diffRaw = main::round(($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
+                $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw
+                $newVal = $minVal if ($newVal < $minVal);
+                $newVal = $maxVal if ($newVal > $maxVal);
+                $response = "Ok";
+            }
+
+            # Stellwert senden
+            fhem("set $device $cmd $newVal") if defined($newVal);
         }
+    }
+    # Antwort erstellen
+    $sendData =  {
+        sessionId => $data->{sessionId},
+        text => $response
+    };
+
+    $json = SNIPS::encodeJSON($sendData);
+    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+}
+
+
+# Neuen Sollwert berechnen
+sub desiredValue($$$$$$) {
+    my ($value, $oldValue, $diff, $minVal, $maxVal, $mapValue) = @_;
+
+    if ($mapValue == 1) {
+        # Werte im min/max Bereich
+
+    } else {
+        # Kein Mapping, nur Begrenzung auf min/max Werte
+        $value = $minVal if (defined($minVal) && $value < $minVal);
+        $value = $maxVal if (defined($maxVal) && $value > $maxVal);
     }
 }
 
