@@ -433,19 +433,4 @@ sub handleIntentSetNumeric($$) {
     MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
 }
 
-
-# Neuen Sollwert berechnen
-sub desiredValue($$$$$$) {
-    my ($value, $oldValue, $diff, $minVal, $maxVal, $mapValue) = @_;
-
-    if ($mapValue == 1) {
-        # Werte im min/max Bereich
-
-    } else {
-        # Kein Mapping, nur Begrenzung auf min/max Werte
-        $value = $minVal if (defined($minVal) && $value < $minVal);
-        $value = $maxVal if (defined($maxVal) && $value > $maxVal);
-    }
-}
-
 1;
