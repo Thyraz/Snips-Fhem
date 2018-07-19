@@ -1,9 +1,15 @@
 # Snips-Fhem
-Fhem Modul für [snips.ai](http://snips.ai)
+FHEM Modul für [snips.ai](http://snips.ai)
 
 ## Inhalt
+[Modul Installation](#Modul-Installation)
 [Snips Installation](#Snips-Installation)
 
+
+
+## Modul Installation
+10_SNIPS.pm nach `opt/fhem/FHEM`kopieren.
+Danach FHEM neu starten
 
 
 
