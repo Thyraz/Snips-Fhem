@@ -5,7 +5,7 @@ FHEM Modul für [snips.ai](http://snips.ai)
 [Modul Installation](#Modul-Installation)\
 [Definition und Konfiguration in FHEM](#Definition-und-Konfiguration-in-FHEM)\
 [Snips Installation](#Snips-Installation)\
-[Erweiterungen für Snips](#Erweiterungen-für-Snips)\
+[Erweiterungen für Snips](#Erweiterungen-für-Snips)
 
 ## Modul Installation
 10_SNIPS.pm nach `opt/fhem/FHEM`kopieren.
@@ -71,7 +71,7 @@ Um die Änderungen an den Reglern dauerhaft zu machen einmal `sudo alsactl store
 
 ### Assistent installieren
 Assistant auf https://console.snips.ai konfigurieren und runterladen.\
-Entpacktes assistant Verzeichnis als /usr/share/snips/assistant speichern\
+Entpacktes assistant Verzeichnis als /usr/share/snips/assistant speichern
 
 Danach die Snips Services stoppen:
 ```
@@ -131,7 +131,7 @@ Das geht erstens schneller, spart aber auch verbrauchte Zeichen im AWS Konto.\
 Polly bietet im ersten Jahr 5 Millionen Zeichen pro Monat kostenlos.\
 Danach zahlt man 4$ pro einer Million zu Sprache gewandelter Zeichen.\
 Einmal die Bibel vorlesen lassen würde somit etwas 16$ kosten. ;)\
-Für normale Sprachausgaben sollte man dank Caching mit 4$ also sehr lange auskommen.\
+Für normale Sprachausgaben sollte man dank Caching mit 4$ also sehr lange auskommen.
 
 Das Snips-TTS-Polly Modul simuliert als Drop-In Ersatz das Verhalten des original Snips-TTS Moduls und lauscht auf entsprechende Anforderungen im MQTT Stream von Snips.\
 Die von Amazon empfangenen Audiodaten werden dann auch über MQTT zurück geliefert, damit die nachfolgenden Snips-Module wie gewohnt funktionieren.
