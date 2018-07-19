@@ -39,7 +39,7 @@ Wenn man seinen Assistent fertig konfiguriert hat, kann man ihn als Zip Datei he
 Ab da funktioniert die Spracherkennung lokal auf dem System.
 
 ## Über Snips-Fhem
-Snips besteht aus mehreren Modulen (Hot-Word Detection, Texterkennung, Natural Language zu Intent Parser, TextToSpeech, ...)\
+Snips besteht aus mehreren Modulen (Hot-Word Detection, Texterkennung, Natural Language zu Intent Parser, ...)\
 All diese Module kommunizieren per MQTT miteinander.\
 Auch das resultiernde JSON Konstrukt, welches Snips am Ende ausspuckt wird über MQTT published.\
 Dieses beinhaltet den IntentNamen und die gesprochenen Wörter der einzelnen Slots. Also z.B. Gerätenamen, Raum, usw.
@@ -47,7 +47,7 @@ Dieses beinhaltet den IntentNamen und die gesprochenen Wörter der einzelnen Slo
 Snips-Fhem wertet diese JSON Nachrichten aus und setzt sie entsprechend in Befehle um.\
 In die andere Richtung sendet Snips-Fhem ebenfalls Nachrichten an Snips um z.B. Antworten für TextToSpeech bereitzustellen.
 
-Snips-Fhem implementiert hierfür keinen eigene MQTT-Verbindung, sondern setzt dafür auf das bestehende 00_MQTT.pm Modul und meldet sich bei diesem als Client an.\ 
+Snips-Fhem implementiert hierfür keinen eigene MQTT-Verbindung, sondern setzt dafür auf das bestehende 00_MQTT.pm Modul und meldet sich bei diesem als Client an.
 
 Es muss vor dem Snips Modul also ein MQTT Device für den Snips MQTT Server in Fhem definiert werden.
 
@@ -58,16 +58,17 @@ Dort eine neue App aus dem Store hinzufügen.\
 Oben den Haken **only show apps with actions** entfernen und nach *FHEM* suchen.
 
 Die App hinzufügen und danach anwählen. Hier auf *Edit App* klicken, dann auf *Fork*.\
-Nun könne ihr in die einzelnen Intents hineinschauen und die Beispielsätze sehen.
+Nun könnt ihr in die einzelnen Intents hineinschauen und die Beispielsätze sehen.
 
 Zusätzlich könnt ihr die Beispiel-Geräte um eure eigenen erweitern.\
-Dazu z.B. im SetOnOff Intent öffnen und beim Slot **de.fhem.Devices** auf editieren klicken.\
+Dazu z.B. den SetOnOff Intent öffnen und beim Slot **de.fhem.Devices** auf editieren klicken.\
 Nun bekommt ihr eine Liste mit bisher von mir eingetragenen Gerätenamen.\
-Erweitert diese um eure Geräte. Der vorne eingetragene Name muss später in Fhem über das Attribut *snipsName* bekannt gemacht werden.
+Erweitert diese um eure Geräte.\
+Der vorne eingetragene Name muss später in Fhem über das Attribut *snipsName* bekannt gemacht werden.
 
-Hier sind auch mehrere Synonyme möglich.\
-So kann man als Synonym für die Deckenlampe z.B. noch Deckenlicht und Wohnzimmerlampe eintragen.\
-Snips wird bei all diesen Bezeichnungen dann später dennoch Deckenlampe statt der Synonyme an FHEM als Slot Device übertragen.
+Es sind auch ein oder mehrere Synonyme möglich.\
+So kann man für die Deckenlampe z.B. noch Deckenlicht und Wohnzimmerlampe eintragen.\
+Snips wird bei all diesen Bezeichnungen dann später dennoch Deckenlampe als Slot Device an FHEM übertragen.
 
 Wenn ihr fertig seit, drückt ihr auf Save und danach auf Deploy Assistant um das ZIP File herunterzuladen.\
 In diesem Schritt findet auch erst die finale Optimierung der Natural Language und Voice Erkennung statt.\
