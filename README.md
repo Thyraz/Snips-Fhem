@@ -1,17 +1,62 @@
 # Snips-Fhem
 FHEM Modul für [snips.ai](http://snips.ai)
 
+Danke an Matthias Kleine, der mit erlaubt hat sein MQTT Client Modul als Vorlage zu verwenden:\
+https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-part-9.html
+
 ## Inhalt
+[Über Snips](#Über-Snips)
+[Über Snips-Fhem](#Über-Snips-Fhem)
 [Modul Installation](#Modul-Installation)\
-[Definition und Konfiguration in FHEM](#Definition-und-Konfiguration-in-FHEM)\
+[Geräte in FHEM für Snips sichtbar machen](#Geräte-in-FHEM-für-Snips-sichtbar-machen)\
 [Snips Installation](#Snips-Installation)\
 [Erweiterungen für Snips](#Erweiterungen-für-Snips)
 
+## Über Snips
+Snips ist ein Sprachassistent ähnlich Siri oder Alexa.\
+Die Besonderheit ist hier, dass Snips nach der Installation komplett Offline betrieben wird.\
+Es wir also keine Sprache zur Erkennung an einen Server im Internet geschickt.
+
+Snips ist dennoch kein Sprachassistent der nur ein paar simple, eintrainierte Sätze versteht.\
+Auch bei Snips steht *Natural Language* im Vordergrund, damit man sich nicht an eine feste Syntax bei den Sprachbefehlen halten muss.
+
+Man legt dafür im Snips Konfigurator unter https://console.snips.ai einen Account an und erstellt sich einen Assistenten indem man *Apps* erstellt oder bestehende hinzufügt.\
+Jede App kann mehrere Intents beinhalten welche Slots für bestimmte Begriffe (z.B. Gerätenamen, Räume, Schaltzustände, ...) beinhaltet.\
+Man *trainiert* die Intents dann mit verschiedensten Beispielsätzen damit der Assistent nachher möglichst gut entscheiden kann was der Nutzer von ihm will.
+
+Snips kann so sehr gut verschiedene Intents unterscheiden, ohne dass diese z.B. wie bei Alexa mit ansagen muss.
+Es ist also nicht wie bei Alexa Custom Skills nötig eine Frage so zu bilden:
+> Alexa, frage SmartHome wie viele Fenster sind geöffnet?
+Sondern kann die Frage direkt aussprechen:
+> Hey Snips, wieviele Fenster sind geöffnet.
+Das verbessert die Akzeptanz einer Sprachsteuerung durch die anderen Familienmitglieder zumindest hier enorm.
+
+Wenn man seinen Assistent fertig kondiguriert hat, kann man ihn als Zip Datei herunterladen und in die Snips Installation einspielen.\
+Ab da funktioniert die Spracherkennung lokal auf dem System.
+
+## Über Snips-Fhem
+Snips besteht aus mehreren Modulen (Hot-Word Detection, Texterkennung, Natural Language zu Intent Parser, TextToSpeech, ...)\
+All diese Module kommunizieren per MQTT miteinander.\
+Auch das resultiernde JSON Konstrukt, welches Snips am Ende ausspuckt wird über MQTT published.\
+Dieses beinhaltet den IntentNamen und die gesprochenen Wörter der einzelnen Slots. Also z.B. Gerätenamen, Raum, usw.
+
+Snips-Fhem wertet diese JSON Nachrichten aus und setzt sie entsprechend in Befehle um.\
+In die andere Richtung sendet Snips-Fhem ebenfalls Nachrichten an Snips um z.B. Antworten für TextToSpeech bereitzustellen.
+
+Snips-Fhem implementiert hierfür keinen eigene MQTT-Verbindung, sondern setzt dafür auf das bestehende 00_MQTT.pm Modul und meldet sich bei diesem als Client an.\ 
+
+Es muss vor dem Snips Modul also ein MQTT Device für den Snips MQTT Server in Fhem definiert werden.
+
 ## Modul Installation
 10_SNIPS.pm nach `opt/fhem/FHEM`kopieren.
-Danach FHEM neu starten
+Danach FHEM neu starten.\
 
-## Definition und Konfiguration in FHEM
+Dann kann man den MQTT Server und Snips in FHEM definieren:
+```
+
+```
+
+## Geräte in FHEM für Snips sichtbar machen 
 
 ## Snips Installation
 
