@@ -131,6 +131,24 @@ sudo aws polly synthesize-speech --output-format mp3 --voice-id Marlene --text '
 Sollte eine hello.mp3 erstellen
 
 #### Snips-TTS-Polly installieren
+Snips liefert von sich aus eine TextToSpeech Lösung aus.
+Diese funktioniert auch komplett offline, klingt aber teilweise etwas dumpf.
+Wer damit leben kann, dass die ausgegebene Sprache über Amazons Server geht, findet mit Polly einen natürlicher klingenden Ersatz.
+Um sich bei AWS zu registrieren braucht man eine Kreditkarte.
+
+Das Modul cached alle von Amazon empfangenen Audiodaten unter /tmp/tss/ um wiederkehrende Texte nicht erneut von Amazon laden zu müssen.
+Das geht erstens schneller, spart aber auch verbrauchte Zeichen im AWS Konto.
+Polly bietet im ersten Jahr 5 Millionen Zeichen pro Monat kostenlos.
+Danach zahlt man 4$ pro einer Million zu Sprache gewandelter Zeichen.
+Einmal die Bibel vorlesen lassen würde somit etwas 16$ kosten. ;)
+Für normale Sprachausgaben sollte man dank Caching mit 4$ also sehr lange auskommen.
+
+Das Snips-TTS-Polly Modul simuliert als Drop-In Ersatz das Verhalten des original Snips-TTS Moduls und lauscht auf entsprechende Anforderungen im MQTT Stream von Snips. Die von Amazon empfangenen Audiodaten werden dann auch über MQTT zurück geliefert, damit die nachfolgenden Snips-Module wie gewohnt funktionieren.
+
+Der von mir unten verlinkte Fork hier auf Github enthält ein paar Änderungen gegenüber dem original Snips-TTS-Polly Modul,
+damit es auch mit Python Versionen kleiner 3.5 lauffähig ist.
+Damit kann man das Modul auch auf Debian Jessie ohne Probleme betreiben.
+
 Damit snips-tts-polly den mqtt server findet muss man die Serverzeile in der Snips config */etc/snips.toml* einkommentieren:
 Raute am Anfang der Zeile `mqtt = "localhost:1883" in Section` *[snips-common]* entfernen
 ```
