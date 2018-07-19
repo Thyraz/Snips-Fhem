@@ -1,3 +1,11 @@
+##############################################
+#
+# FHEM snips.ai modul  http://snips.ai)
+#
+# written 2018 by Tobias Wiedenmann (Thyraz)
+# thanks to Matthias Kleine
+#
+##############################################
 
 use strict;
 use warnings;
@@ -72,11 +80,12 @@ sub Define() {
     my @args = split("[ \t]+", $def);
 
     # Minimale Anzahl der nötigen Argumente vorhanden?
-    return "Invalid number of arguments: define <name> SNIPS IODev Prefix" if (int(@args) < 4);
+    return "Invalid number of arguments: define <name> SNIPS IODev Prefix DefaultRoom" if (int(@args) < 5);
 
-    my ($name, $type, $IODev, $prefix) = @args;
+    my ($name, $type, $IODev, $prefix, $defaultRoom) = @args;
     $hash->{MODULE_VERSION} = "0.1";
     $hash->{helper}{prefix} = $prefix;
+    $hash->{helper}{defaultRoom} = $defaultRoom;
 
     # IODev setzen und als MQTT Client registrieren
     $main::attr{$name}{IODev} = $IODev;
@@ -114,7 +123,7 @@ sub Set($$$@) {
 
     # Say Befehl
     if ($command eq "say") {
-        my $topic = "hermes/path/to/tts";
+        my $topic = "hermes/tts/say";
         my $value = join (" ", @values);
 
         $msgid = send_publish($hash->{IODev}, topic => $topic, message => $value, qos => $qos, retain => $retain);
@@ -169,7 +178,7 @@ sub roomName ($$) {
   my ($hash, $data) = @_;
 
   my $room;
-  my $defaultRoom = AttrVal($hash->{NAME},"defaultRoom","default");
+  my $defaultRoom = $hash->{helper}{defaultRoom};
 
   # Slot "Room" im JSON vorhanden? Sonst Raum des angesprochenen Satelites verwenden
   if (exists($data->{'Room'})) {
@@ -259,6 +268,8 @@ sub parseJSON($$$) {
             my $slotName = $slot->{'slotName'};
             my $slotValue = $slot->{'value'}{'value'};
 
+            Log3($hash->{NAME}, 5, "Parsed value: $slotValue for slot: $slotName from JSON");
+
             $data->{$slotName} = $slotValue;
         }
     }
@@ -321,12 +332,12 @@ sub handleIntentSetOnOff($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room;
     my $mapping;
-    my $deviceName;
     my $sendData, my $json;
-    my $response = "Da ist etwas schief gegeangen.";
+    my $response = "Da ist etwas schief gegangen.";
 
     Log3($hash->{NAME}, 5, "handleIntentSetOnOff called");
 
+    # Mindestens Gerät und Wert müssen übergeben worden sein
     if (exists($data->{'Device'}) && exists($data->{'Value'})) {
         $room = roomName($hash, $data);
         $value = $data->{'Value'};
@@ -335,6 +346,7 @@ sub handleIntentSetOnOff($$) {
 
         Log3($hash->{NAME}, 5, "SetOnOff-Intent: " . $room . " " . $device . " " . $value);
 
+        # Mapping gefunden?
         if (defined($device) && defined($mapping)) {
             my $cmdOn  = (defined($mapping->{'cmdOn'}))  ? $mapping->{'cmdOn'}  :  "on";
             my $cmdOff = (defined($mapping->{'cmdOff'})) ? $mapping->{'cmdOff'} : "off";
@@ -361,22 +373,45 @@ sub handleIntentGetOnOff($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room, my $status;
     my $mapping;
-    my $deviceName;
     my $sendData, my $json;
-    my $response = "Da ist etwas schief gegeangen.";
+    my $response = "Da ist etwas schief gegangen.";
+    my $value;
 
     Log3($hash->{NAME}, 5, "handleIntentGetOnOff called");
 
+    # Mindestens Gerät und Status-Art wurden übergeben
     if (exists($data->{'Device'}) && exists($data->{'Status'})) {
         $room = roomName($hash, $data);
         $device = getDevice($hash, $room, $data->{'Device'});
         $mapping = getMapping($hash, $device, "GetOnOff", undef);
+        $status = $data->{'Status'};
 
-        if (defined($device) && defined($mapping)) {
+        # Mapping gefunden?
+        if (defined($mapping)) {
+            my $reading = $mapping->{'GetOnOff'};
+            my $valueOn   = (defined($mapping->{'valueOn'}))  ? $mapping->{'valueOn'}  : undef;
+            my $valueOff  = (defined($mapping->{'valueOff'})) ? $mapping->{'valueOff'} : undef;
+            my $value = ReadingsVal($device, $reading, undef);
 
+            # Entscheiden ob $value 0 oder 1 ist
+            if (defined($valueOff)) {
+                $value = (lc($value) eq lc($valueOff)) ? 0 : 1;
+            } elsif (defined($valueOn)) {
+                $value = (lc($value) eq lc($valueOn)) ? 1 : 0;
+            } else {
+                # valueOn und valueOff sind nicht angegeben worden, alles außer "off" wird als eine 1 gewertet
+                $value = (lc($value) eq "off") ? 0 : 1;
+            }
+
+            # Antwort erstellen
+            if    ($status =~ m/^(an|aus)$/ && $value == 1) { $response = $data->{'Device'} . " ist eingeschaltet"; }
+            elsif ($status =~ m/^(an|aus)$/ && $value == 0) { $response = $data->{'Device'} . " ist ausgeschaltet"; }
+            elsif ($status =~ m/^(auf|zu)$/ && $value == 1) { $response = $data->{'Device'} . " ist geöffnet"; }
+            elsif ($status =~ m/^(auf|zu)$/ && $value == 0) { $response = $data->{'Device'} . " ist geschlossen"; }
+            elsif ($status =~ m/^(läuft|fertig)$/ && $value == 1) { $response = $data->{'Device'} . " läuft noch"; }
+            elsif ($status =~ m/^(läuft|fertig)$/ && $value == 0) { $response = $data->{'Device'} . " ist fertig"; }
         }
     }
-
     # Antwort erstellen und Senden
     $sendData =  {
         sessionId => $data->{sessionId},
@@ -395,7 +430,7 @@ sub handleIntentSetNumeric($$) {
     my $mapping;
     my $sendData, my $json;
     my $validData = 0;
-    my $response = "Da ist etwas schief gegeangen.";
+    my $response = "Da ist etwas schief gegangen.";
 
     Log3($hash->{NAME}, 5, "handleIntentSetNumeric called");
 
@@ -405,7 +440,7 @@ sub handleIntentSetNumeric($$) {
     $validData = 1 if (exists($data->{'Device'}) && exists($data->{'Change'}));
 
     if ($validData == 1) {
-        $type = $data->{'Unit'};
+        $unit = $data->{'Unit'};
         $type = $data->{'Type'};
         $value = $data->{'Value'};
         $change = $data->{'Change'};
@@ -416,7 +451,7 @@ sub handleIntentSetNumeric($$) {
         Log3($hash->{NAME}, 5, "SetNumeric-Intent: " . $room . " " . $device . " " . $value . " " . $change . " " . $type);
 
         # Mapping und Gerät gefunden -> Befehl ausführen
-        if (defined($device) && defined($mapping) && defined($mapping->{'cmd'})) {
+        if (defined($mapping) && defined($mapping->{'cmd'})) {
             my $cmd     = $mapping->{'cmd'};
             my $reading = $mapping->{'SetNumeric'};
             my $minVal  = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : 0; # Snips kann keine negativen Nummern bisher, daher erzwungener minVal
@@ -424,13 +459,13 @@ sub handleIntentSetNumeric($$) {
             my $oldVal  = ReadingsVal($device, $reading, 0);
             my $diff    = (defined($value)) ? $value : ((defined($mapping->{'step'})) ? $mapping->{'step'} : 10);
             my $up      = (defined($change) && ($change =~ m/^(rauf|heller|lauter)$/)) ? 1 : 0;
-            my $isPercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "limits") ? 1 : 0;
+            my $isPercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent") ? 1 : 0;
 
             # Neuen Stellwert bestimmen
             my $newVal;
 
             # Direkter Stellwert
-            if (defined($value) && !defined($change) && !$isPercent) {
+            if ($unit ne "Prozent" && defined($value) && !defined($change) && !$isPercent) {
                 $newVal = $value;
                 # Begrenzung auf evtl. gesetzte min/max Werte
                 $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
@@ -438,7 +473,7 @@ sub handleIntentSetNumeric($$) {
                 $response = "Ok";
             }
             # Direkter Stellwert als Prozent
-            elsif (defined($value) && !defined($change) && $isPercent && defined($minVal) && defined($maxVal)) {
+            elsif (defined($value) && ($unit eq "Prozent" || (!defined($change) && $isPercent)) && defined($minVal) && defined($maxVal)) {
                 # Wert von Prozent in Raw-Wert umrechnen
                 $newVal = $value;
                 $newVal =   0 if ($newVal <   0);
@@ -447,14 +482,14 @@ sub handleIntentSetNumeric($$) {
                 $response = "Ok";
             }
             # Stellwert um Wert x ändern
-            elsif (defined($change) && !$isPercent) {
+            elsif ($unit ne "Prozent" && defined($change) && !$isPercent) {
                 $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
                 $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
                 $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
                 $response = "Ok";
             }
             # Stellwert um Prozent x ändern
-            elsif (defined($change) && $isPercent && defined($minVal) && defined($maxVal)) {
+            elsif (($unit eq "Prozent" || (defined($change) && $isPercent)) && defined($minVal) && defined($maxVal)) {
                 my $diffRaw = main::round((($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
                 $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw;
                 $newVal = $minVal if ($newVal < $minVal);
@@ -466,7 +501,7 @@ sub handleIntentSetNumeric($$) {
             fhem("set $device $cmd $newVal") if defined($newVal);
         }
     }
-    # Antwort erstellen
+    # Antwort erstellen und senden
     $sendData =  {
         sessionId => $data->{sessionId},
         text => $response
@@ -474,6 +509,18 @@ sub handleIntentSetNumeric($$) {
 
     $json = SNIPS::encodeJSON($sendData);
     MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+}
+
+sub handleIntentGetNumeric($$) {
+    my ($hash, $data) = @_;
+    my $value, my $device, my $room, my $type;
+    my $mapping;
+    my $sendData, my $json;
+    my $response = "Da ist etwas schief gegangen.";
+
+    if (exists($data->{'Device'}) && exists($data->{'Type'})) {
+
+    }
 }
 
 1;
