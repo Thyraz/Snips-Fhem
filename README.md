@@ -1,12 +1,13 @@
 # Snips-Fhem
 FHEM Modul für [snips.ai](http://snips.ai)
 
-Danke an Matthias Kleine, der mit erlaubt hat sein MQTT Client Modul als Vorlage zu verwenden:\
+Danke an Matthias Kleine, der mir erlaubt hat sein MQTT Client Modul als Vorlage zu verwenden:\
 https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-part-9.html
 
 ## Inhalt
-[Über Snips](#Über-Snips)
-[Über Snips-Fhem](#Über-Snips-Fhem)
+[Über Snips](#Über-Snips)\
+[Über Snips-Fhem](#Über-Snips-Fhem)\
+[Assistent erstellen](#Assistent-erstellen)\
 [Modul Installation](#Modul-Installation)\
 [Geräte in FHEM für Snips sichtbar machen](#Geräte-in-FHEM-für-Snips-sichtbar-machen)\
 [Snips Installation](#Snips-Installation)\
@@ -18,20 +19,23 @@ Die Besonderheit ist hier, dass Snips nach der Installation komplett Offline bet
 Es wir also keine Sprache zur Erkennung an einen Server im Internet geschickt.
 
 Snips ist dennoch kein Sprachassistent der nur ein paar simple, eintrainierte Sätze versteht.\
-Auch bei Snips steht *Natural Language* im Vordergrund, damit man sich nicht an eine feste Syntax bei den Sprachbefehlen halten muss.
+Auch bei Snips steht *Natural Language* im Vordergrund,\
+damit man sich nicht an eine feste Syntax bei den Sprachbefehlen halten muss.
 
 Man legt dafür im Snips Konfigurator unter https://console.snips.ai einen Account an und erstellt sich einen Assistenten indem man *Apps* erstellt oder bestehende hinzufügt.\
 Jede App kann mehrere Intents beinhalten welche Slots für bestimmte Begriffe (z.B. Gerätenamen, Räume, Schaltzustände, ...) beinhaltet.\
 Man *trainiert* die Intents dann mit verschiedensten Beispielsätzen damit der Assistent nachher möglichst gut entscheiden kann was der Nutzer von ihm will.
 
-Snips kann so sehr gut verschiedene Intents unterscheiden, ohne dass diese z.B. wie bei Alexa mit ansagen muss.
+Snips kann so sehr gut verschiedene Intents unterscheiden, ohne dass diese z.B. wie bei Alexa mit ansagen muss.\
 Es ist also nicht wie bei Alexa Custom Skills nötig eine Frage so zu bilden:
 > Alexa, frage SmartHome wie viele Fenster sind geöffnet?
+
 Sondern kann die Frage direkt aussprechen:
 > Hey Snips, wieviele Fenster sind geöffnet.
+
 Das verbessert die Akzeptanz einer Sprachsteuerung durch die anderen Familienmitglieder zumindest hier enorm.
 
-Wenn man seinen Assistent fertig kondiguriert hat, kann man ihn als Zip Datei herunterladen und in die Snips Installation einspielen.\
+Wenn man seinen Assistent fertig konfiguriert hat, kann man ihn als Zip Datei herunterladen und in die Snips Installation einspielen.\
 Ab da funktioniert die Spracherkennung lokal auf dem System.
 
 ## Über Snips-Fhem
@@ -46,6 +50,30 @@ In die andere Richtung sendet Snips-Fhem ebenfalls Nachrichten an Snips um z.B. 
 Snips-Fhem implementiert hierfür keinen eigene MQTT-Verbindung, sondern setzt dafür auf das bestehende 00_MQTT.pm Modul und meldet sich bei diesem als Client an.\ 
 
 Es muss vor dem Snips Modul also ein MQTT Device für den Snips MQTT Server in Fhem definiert werden.
+
+## Assistent erstellen
+Account unter https://console.snips.ai erstellen und einen neuen Assistenten erstellen.
+
+Dort eine neue App aus dem Store hinzufügen.\
+Oben den Haken **only show apps with actions** entfernen und nach *FHEM* suchen.
+
+Die App hinzufügen und danach anwählen. Hier auf *Edit App* klicken, dann auf *Fork*.\
+Nun könne ihr in die einzelnen Intents hineinschauen und die Beispielsätze sehen.
+
+Zusätzlich könnt ihr die Beispiel-Geräte um eure eigenen erweitern.\
+Dazu z.B. im SetOnOff Intent öffnen und beim Slot **de.fhem.Devices** auf editieren klicken.\
+Nun bekommt ihr eine Liste mit bisher von mir eingetragenen Gerätenamen.\
+Erweitert diese um eure Geräte. Der vorne eingetragene Name muss später in Fhem über das Attribut *snipsName* bekannt gemacht werden.
+
+Hier sind auch mehrere Synonyme möglich.\
+So kann man als Synonym für die Deckenlampe z.B. noch Deckenlicht und Wohnzimmerlampe eintragen.\
+Snips wird bei all diesen Bezeichnungen dann später dennoch Deckenlampe statt der Synonyme an FHEM als Slot Device übertragen.
+
+Wenn ihr fertig seit, drückt ihr auf Save und danach auf Deploy Assistant um das ZIP File herunterzuladen.\
+In diesem Schritt findet auch erst die finale Optimierung der Natural Language und Voice Erkennung statt.\
+Falls ihr Snips statt auf einer echten Installation erstmal im Browser unter https://console.snips.ai testen wollt,\
+solltet ihr also dennoch nach jeder Änderung einmal den Download des Assistenten anstoßen.\
+Ansonsten kann es sein, dass die Spracherkennung über das Micro des Rechners, oder die Texterkennung des eingegebenen Textes nicht richtig funktioniert.
 
 ## Modul Installation
 10_SNIPS.pm nach `opt/fhem/FHEM`kopieren.
