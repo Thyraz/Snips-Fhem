@@ -1,5 +1,9 @@
 # Snips-Fhem
-Fhem module for snips.ai
+Fhem Modul für [snips.ai](http://snips.ai)
+
+## Inhalt
+[Snips Installation](#Snips-Installation)
+
 
 
 
