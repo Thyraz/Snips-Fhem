@@ -32,10 +32,10 @@ https://snips.gitbook.io/documentation/advanced-configuration/advanced-solutions
 
 
 ### Sound Setup
-über `<aplay -l>` und `<arecord -l>` kann man sich erkannte Soundkarten und Mikrofone anzeigen lassen.
+über `aplay -l` und `arecord -l` kann man sich erkannte Soundkarten und Mikrofone anzeigen lassen.
 Hier ist jeweils die Nummer für "card" und "device" interessant.
 
-Mit den Werten muss dann die Datei `</etc/asound.conf>` angepasst bzw. erstellt werden:
+Mit den Werten muss dann die Datei `/etc/asound.conf` angepasst bzw. erstellt werden:
 ```
 sudo nano /etc/asound.conf
 ```
@@ -53,13 +53,13 @@ pcm.!default {
   }
 }
 ```
-Hier bei `<hw:x,x>` entsprechend Card und Device aus euren Listings von oben verwenden.
+Hier bei `hw:x,x` entsprechend Card und Device aus euren Listings von oben verwenden.
 Bei dem obigen Beispiel ist die interne Soundkarte Card 0 und Device 0.
 Das Mikrofon ist ein USB-Gerät, welches als Card 1, Device0 erkannt wurde.
 
-Mit `<alsamixer>`kann ein Tool zum ändern der Lautstärke gestartet werden.
+Mit `alsamixer`kann ein Tool zum ändern der Lautstärke gestartet werden.
 Evtl. muss hier noch die Masterlautstärke für die Lautsprecher oder das Mikrofon erhöht werden.
-Um die Änderungen an den Reglern dauerhaft zu machen einmal `<sudo alsactl store>`ausführen.
+Um die Änderungen an den Reglern dauerhaft zu machen einmal `sudo alsactl store`ausführen.
 
 ### Assistent installieren
 Assistant auf
