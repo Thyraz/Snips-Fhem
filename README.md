@@ -8,6 +8,7 @@ FHEM Modul für [snips.ai](http://snips.ai)
 
 [Snips Installation](#Snips-Installation)
 
+[Erweiterungen für Snips](#Erweiterungen-für-Snips)
 
 
 ## Modul Installation
@@ -96,3 +97,61 @@ sudo systemctl status "snips-*"
 ```
 
 Danach sollte Snips über *Hey Snips* geweckt werden können.
+
+
+## Erweiterungen für Snips
+
+### Bessere Sprachausgabe mit Amazon Polly
+#### AWS Konto erstellen 
+Konto erstellen auf aws.amazon.com
+User & Groups Dashboard aufrufen: console.aws.amazon.com/aim
+Links im Menu auf Groups klicken
+Create new Group wählen und als Name polly eingeben
+AmazonPollyFullAccess policy auswählen und Gruppe erstellen
+Links im Menu auf Users klicken
+Add User wählen und als Name polly eingeben und als Access Type "Programatic Access" wählen
+Im nächsten Schritt als Gruppe die vorhin erstellte Gruppe polly anwählen
+Achtung: Am Ende werden Access key ID und Secret access key angezeigt. Diese jetzt kopieren, da wir sie nachher zum Authorisieren brauchen.
+
+#### Installation auf dem Snips Rechner
+```
+sudo apt-get install mpg123
+sudo pip3 install toml
+sudo pip3 install paho-mqtt
+sudo pip3 install boto3
+sudo pip3 install awscli
+sudo aws configure
+```
+Als Default region name `eu-central-1` eingeben
+Als output format `json` eingeben
+Testen in der Console:
+```
+sudo aws polly synthesize-speech --output-format mp3 --voice-id Marlene --text 'Hallo, ich kann deine neue Snips Stimme sein wenn du willst.' hello.mp3
+```
+Sollte eine hello.mp3 erstellen
+
+#### Snips-TTS-Polly installieren
+Damit snips-tts-polly den mqtt server findet muss man die Serverzeile in der Snips config */etc/snips.toml* einkommentieren:
+Raute am Anfang der Zeile `mqtt = "localhost:1883" in Section` *[snips-common]* entfernen
+```
+sudo apt-get install git
+cd /opt
+sudo git clone https://github.com/Thyraz/snips-tts-polly.git
+cd snips-tts-polly
+```
+testweise mit `sudo ./snips-tts-polly` starten.
+Wenn keine Fehler kommen und das Programm bis *MQTT connected* läuft kann mit __STRG+C__ abgebrochen werden.
+Kopieren des python scripts: `sudo cp snips-tts-polly /usr/bin`
+Kopieren des Systemd services: `sudo cp snips-tts-polly.service /etc/systemd/system/`
+`sudo systemctl daemon-reload`
+Dann den normalen TTS Service von Snips beenden und Polly starten:
+```
+sudo systemctl stop snips-tts
+sudo systemctl start snips-tts-polly
+```
+Nun sollten Textausgaben mit Polly erfolgen.
+Damit das noch einen Systemstart überlebt, muss noch folgendes ausgeführt werden:
+```
+sudo systemctl disable snips-tts
+sudo systemctl enable snips-tts-polly
+```
