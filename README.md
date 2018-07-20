@@ -70,7 +70,7 @@ Es sind auch ein oder mehrere Synonyme möglich.\
 So kann man für die Deckenlampe z.B. noch Deckenlicht und Wohnzimmerlampe eintragen.\
 Snips wird bei all diesen Bezeichnungen dann später dennoch Deckenlampe als Slot Device an FHEM übertragen.
 
-Wenn ihr fertig seit, drückt ihr auf Save und danach auf Deploy Assistant um das ZIP File herunterzuladen.\
+Wenn ihr fertig seid, drückt ihr auf Save und danach auf Deploy Assistant um das ZIP File herunterzuladen.\
 In diesem Schritt findet auch erst die finale Optimierung der Natural Language und Voice Erkennung statt.\
 Falls ihr Snips statt auf einer echten Installation erstmal im Browser unter https://console.snips.ai testen wollt,\
 solltet ihr also dennoch nach jeder Änderung einmal den Download des Assistenten anstoßen.\
@@ -80,10 +80,27 @@ Ansonsten kann es sein, dass die Spracherkennung über das Micro des Rechners, o
 10_SNIPS.pm nach `opt/fhem/FHEM`kopieren.
 Danach FHEM neu starten.\
 
-Dann kann man den MQTT Server und Snips in FHEM definieren:
+Die Syntax zur Definition des Moduls sieht so aus:
+```
+define <name> SNIPS <Prefix> <DefaultRoom>
+```
+* Prefix ist euer Accountname auf https://console.snips.ai \
+Dieser wird als Prefix vor jedem Intent von Snips über MQTT mitgeschickt,\
+damit mehrere Snips Instanzen auf einem MQTT Server möglich sind.\
+Im Beispiel vom Account Namen Homer sähe ein Intent also z.B. so aus: *hermes/intent/Homer:OnOffIntent*
+
+* DefaultRoom weist die Snips Hauptinstanz einem Raum zu.\
+Im Gegensatz zu weiteren Snips Satellites in anderen Räumen,\
+kann die Hauptinstanz nicht umbenannt werden und heißt immer *default*.
+Um den Raumnamen bei einigen Befehlen weglassen zu können, sofern sie den aktuellen Raum betreffen ,\
+muss Snips eben wissen in welchem Raum man sich befindet.
+
+Beispiel für die Definition des MQTT Servers und Snips in FHEM:
+```
+define SnipsMQTT MQTT <ip-or-hostname-of-snips-machine>:1883
+define Snips SNIPS SnipsMQTT Homer Wohnzimmer
 ```
 
-```
 
 ## Geräte in FHEM für Snips sichtbar machen 
 
