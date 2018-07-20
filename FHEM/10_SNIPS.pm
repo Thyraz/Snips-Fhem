@@ -119,21 +119,24 @@ sub Set($$$@) {
 
     Log3($hash->{NAME}, 5, "set " . $command . " - value: " . join (" ", @values));
 
-    my $msgid;
-    my $retain = $hash->{".retain"}->{'*'};
-    my $qos = $hash->{".qos"}->{'*'};
-
     # Say Befehl
     if ($command eq "say") {
-        my $topic = "hermes/tts/say";
-        my $value = join (" ", @values);
+        my $text = join (" ", @values);
+        my $sendData, my $json;
 
-        $msgid = send_publish($hash->{IODev}, topic => $topic, message => $value, qos => $qos, retain => $retain);
-        Log3($hash->{NAME}, 5, "sent (tts) '" . $value . "' to " . $topic);
+        $sendData =  {
+            siteId => "default",
+            text => $text,
+            lang => "de",
+            id => "0",
+            sessionId => "0"
+        };
+
+        $json = SNIPS::encodeJSON($sendData);
+        MQTT::send_publish($hash->{IODev}, topic => 'hermes/tts/say', message => $json, qos => 0, retain => "0");
     }
-
-    $hash->{message_ids}->{$msgid}++ if defined $msgid;
 }
+
 
 # Attribute setzen / löschen
 sub Attr($$$$) {
@@ -270,7 +273,7 @@ sub parseJSON($$$) {
             my $slotName = $slot->{'slotName'};
             my $slotValue = $slot->{'value'}{'value'};
 
-            Log3($hash->{NAME}, 5, "Parsed value: $slotValue for slot: $slotName from JSON");
+            Log3($hash->{NAME}, 5, "Parsed value: $slotValue for slot: $slotName");
 
             $data->{$slotName} = $slotValue;
         }
@@ -286,10 +289,10 @@ sub encodeJSON($) {
 
     # JSON Encode und Fehlerüberprüfung
     $json = eval { toJSON($hashRef) };
-    if ($@) {
-          Log3($hash->{NAME}, 5, "JSON Encoding Error");
-          return undef;
-    }
+#    if ($@) {
+#          Log3($hash->{NAME}, 5, "JSON Encoding Error");
+#          return undef;
+#    }
 
     return $json;
 }
@@ -346,8 +349,6 @@ sub handleIntentSetOnOff($$) {
         $value = $data->{'Value'};
         $device = getDevice($hash, $room, $data->{'Device'});
         $mapping = getMapping($hash, $device, "SetOnOff", undef);
-
-        Log3($hash->{NAME}, 5, "SetOnOff-Intent: " . $room . " " . $device . " " . $value);
 
         # Mapping gefunden?
         if (defined($device) && defined($mapping)) {
@@ -451,14 +452,12 @@ sub handleIntentSetNumeric($$) {
         $device = getDevice($hash, $room, $data->{'Device'});
         $mapping = getMapping($hash, $device, "SetNumeric", $type);
 
-        Log3($hash->{NAME}, 5, "SetNumeric-Intent: " . $room . " " . $device . " " . $value . " " . $change . " " . $type);
-
         # Mapping und Gerät gefunden -> Befehl ausführen
         if (defined($mapping) && defined($mapping->{'cmd'})) {
             my $cmd     = $mapping->{'cmd'};
             my $reading = $mapping->{'SetNumeric'};
             my $minVal  = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : 0; # Snips kann keine negativen Nummern bisher, daher erzwungener minVal
-            my $maxVal  = (defined($mapping->{'maxVal'})) ? $mapping->{'maxVal'} : undef;
+            my $maxVal  = $mapping->{'maxVal'};
             my $oldVal  = ReadingsVal($device, $reading, 0);
             my $diff    = (defined($value)) ? $value : ((defined($mapping->{'step'})) ? $mapping->{'step'} : 10);
             my $up      = (defined($change) && ($change =~ m/^(rauf|heller|lauter|wärmer)$/)) ? 1 : 0;
@@ -475,8 +474,8 @@ sub handleIntentSetNumeric($$) {
                 $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
                 $response = "Ok";
             }
-            # Direkter Stellwert als Prozent ("Stelle Lampe auf 50 Prozent", oder "Stelle Lampe auf 50" bei $forcePercent)
-            elsif (defined($value) && (!defined($change) && ($unit eq "Prozent" ||  && $forcePercent)) && defined($minVal) && defined($maxVal)) {
+            # Direkter Stellwert als Prozent ("Stelle Lampe auf 50 Prozent", oder "Stelle Lampe auf 50" bei forcePercent)
+            elsif (defined($value) && ($unit eq "Prozent" || $forcePercent) && !defined($change) && defined($minVal) && defined($maxVal)) {
                 # Wert von Prozent in Raw-Wert umrechnen
                 $newVal = $value;
                 $newVal =   0 if ($newVal <   0);
@@ -491,8 +490,8 @@ sub handleIntentSetNumeric($$) {
                 $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
                 $response = "Ok";
             }
-            # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei $forcePercent oder "Mache Lampe heller" bei $forcePercent)
-            elsif (($unit eq "Prozent" || (defined($change) && $forcePercent)) && defined($minVal) && defined($maxVal)) {
+            # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei forcePercent oder "Mache Lampe heller" bei forcePercent)
+            elsif (($unit eq "Prozent" || $forcePercent) && defined($change)  && defined($minVal) && defined($maxVal)) {
                 my $diffRaw = main::round((($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
                 $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw;
                 $newVal = $minVal if ($newVal < $minVal);
@@ -514,6 +513,8 @@ sub handleIntentSetNumeric($$) {
     MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
 }
 
+
+# Eingehende "GetNumeric" Intents bearbeiten
 sub handleIntentGetNumeric($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room, my $type;
@@ -521,9 +522,33 @@ sub handleIntentGetNumeric($$) {
     my $sendData, my $json;
     my $response = "Da ist etwas schief gegangen.";
 
-    if (exists($data->{'Device'}) && exists($data->{'Type'})) {
+    Log3($hash->{NAME}, 5, "handleIntentGetNumeric called");
 
+    # Mindestens Gerät und Type müssen existieren
+    if (exists($data->{'Device'}) && exists($data->{'Type'})) {
+        $type = $data->{'Type'};
+        $room = roomName($hash, $data);
+        $device = getDevice($hash, $room, $data->{'Device'});
+        $mapping = getMapping($hash, $device, "GetNumeric", $type);
+
+        if (defined($mapping)) {
+            my $reading = $mapping->{'GetNumeric'};
+            my $value = ReadingsVal($device, $reading, undef);
+            my $minVal  = $mapping->{'minVal'};
+            my $maxVal  = $mapping->{'maxVal'};
+            my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent") ? 1 : 0;
+
+            $response = $data->{'Device'} . " hat den Wert $value";
+        }
     }
+    # Antwort erstellen und senden
+    $sendData =  {
+        sessionId => $data->{sessionId},
+        text => $response
+    };
+
+    $json = SNIPS::encodeJSON($sendData);
+    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
 }
 
 1;
