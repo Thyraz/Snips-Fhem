@@ -105,6 +105,41 @@ define Snips SNIPS SnipsMQTT Homer Wohnzimmer
 
 
 ## Geräte in FHEM für Snips sichtbar machen 
+Damit Snips Geräte aus FHEM erkennt und auch ansprechen/abfragen kann, sind ein paar Voraussetzungen zu erfüllen:
+
+### Raum Snips
+Snips sucht nur nach Geräten, die in FHEM im Raum **Snips** liegen.\
+Also bei allen Geräten die ihr ansprechen wollt diesen Raum hinzufügen.
+
+### Attribut snipsName
+Jedem Gerät in FHEM kann das Attribut **snipsName** hinzugefügt werden.\
+Snips kann Geräte anhand dieser Kriterien finden:
+* Attribut snipsName
+* Attribut alias
+* Name des Geräts in FHEM
+
+### Attribut snipsRoom
+Jedem Gerät in FHEM kann das Attribut **snipsRoom** hinzugefügt werden.\
+Snips kann Geräte anhand dieser Kriterien einem Raum zuordnen:
+* Attribut snipsRoom
+* Alle gewählten Räume im Attribut room
+
+### Intents über snipsMapping zuordnen
+Das Snips Modul hat bisher noch keine automatische Erkennung von Intents für bestimmte Gerätetypen.\
+Es müssen also bei jedem Device die unterstützten Intents über ein Mapping bekannt gemacht werden.
+
+Das Mapping folgt dabei dem Schema:
+```
+IntentName=currentValueReading,option1=value1,option2=value2,...
+```
+
+* *SetOnOff* <description>
+
+* *GetOnOff* <description>
+  
+* *SetNumeric* <description>
+  
+* *GetNumeric* <description>
 
 ## Snips Installation
 
