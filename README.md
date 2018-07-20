@@ -182,7 +182,7 @@ kann die Zahl über die Option *part=0* extrahiert werden.
     * __*map*__ Bisher nur ein Wert für diese Option möglich: *percent*
   
   *Erläuterung zu map=percent:\
-  Ist die Option gesetzt, werden alle numerischen Stellwerte als Prozentangaben zwischen minVal und maxVal verstanden.
+  Ist die Option gesetzt, werden alle numerischen Stellwerte als Prozentangaben zwischen minVal und maxVal verstanden.\
   Bei einer Lampe mit `minVal=0` und `maxVal=255` hat also **Stelle die Lampe auf 50**\
   das selbe Verhalten wie **Stelle die Lampe auf 50 Prozent**.\
   Dies mag bei einer Lampe mehr Sinn ergeben als Werte von 0...255 anzusagen.\
@@ -190,8 +190,8 @@ kann die Zahl über die Option *part=0* extrahiert werden.
   da dort die Angaben normal in °C erfolgen und nicht prozentual zum möglichen Sollwertbereich.*
   
   Beispielsätze:
-  > Stelle die Deckenlampe auf 30 Prozent
-  > Mach das Radio leiser
+  > Stelle die Deckenlampe auf 30 Prozent\
+  > Mach das Radio leiser\
   > Stelle die Heizung im Büro um 2 Grad wärmer
 
 * **GetNumeric**\
