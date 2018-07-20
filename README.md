@@ -10,8 +10,8 @@ https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-p
 [Assistent erstellen](#assistent-erstellen)\
 [Modul Installation](#modul-installation)\
 [Geräte in FHEM für Snips sichtbar machen](#geräte-in-fhem-für-snips-sichtbar-machen)\
-[Snips Installation](#snips-installation)\
-[Erweiterungen für Snips](#erweiterungen-für-snips)
+[Anhang 1: Snips Installation](#snips-installation)\
+[Anhang 2: Erweiterungen für Snips](#erweiterungen-für-snips)
 
 ## Über Snips
 Snips ist ein Sprachassistent ähnlich Siri oder Alexa.\
