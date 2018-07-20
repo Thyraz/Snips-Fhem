@@ -5,13 +5,13 @@ Danke an Matthias Kleine, der mir erlaubt hat sein MQTT Client Modul als Vorlage
 https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-part-9.html
 
 ## Inhalt
-[Über Snips](#Über-Snips)\
+[Über Snips](#über-snips)\
 [Über Snips-Fhem](#Über-Snips-Fhem)\
-[Assistent erstellen](#Assistent-erstellen)\
-[Modul Installation](#Modul-Installation)\
-[Geräte in FHEM für Snips sichtbar machen](#Geräte-in-FHEM-für-Snips-sichtbar-machen)\
-[Snips Installation](#Snips-Installation)\
-[Erweiterungen für Snips](#Erweiterungen-für-Snips)
+[Assistent erstellen](#assistent-erstellen)\
+[Modul Installation](#modul-installation)\
+[Geräte in FHEM für Snips sichtbar machen](#geräte-in-fhem-für-snips-sichtbar-machen)\
+[Snips Installation](#snips-installation)\
+[Erweiterungen für Snips](#erweiterungen-für-snips)
 
 ## Über Snips
 Snips ist ein Sprachassistent ähnlich Siri oder Alexa.\
