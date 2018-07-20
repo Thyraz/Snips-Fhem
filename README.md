@@ -104,7 +104,7 @@ define Snips SNIPS SnipsMQTT Homer Wohnzimmer
 ```
 
 
-## Geräte in FHEM für Snips sichtbar machen 
+## Geräte in FHEM für Snips sichtbar machen
 Damit Snips Geräte aus FHEM erkennt und auch ansprechen/abfragen kann, sind ein paar Voraussetzungen zu erfüllen:
 
 ### Raum Snips
@@ -126,7 +126,8 @@ Snips kann Geräte anhand dieser Kriterien einem Raum zuordnen:
 
 ### Intents über snipsMapping zuordnen
 Das Snips Modul hat bisher noch keine automatische Erkennung von Intents für bestimmte Gerätetypen.\
-Es müssen also bei jedem Device die unterstützten Intents über ein Mapping bekannt gemacht werden.
+Es müssen also bei jedem Device die unterstützten Intents über ein Mapping bekannt gemacht werden.\
+Einem Gerät können mehrere Intents zugewiesen werden, dazu einfach eine Zeile ein Mapping im Attribut einfügen.
 
 Das Mapping folgt dabei dem Schema:
 ```
@@ -146,8 +147,16 @@ IntentName=currentValueReading,option1=value1,option2=value2,...
   > Mache das Radio an\
   > Öffne den Rollladen im Wohnzimmer
 
-
 * **GetOnOff** <description>
+  Beispiel: `GetOnOff=reportedState,valueOff=closed`\
+  Optionen: *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.
+    * *valueOff* Wert von *currentValueReading* der als **off** gewertet wird
+    * *valueOn* Wert von *currentValueReading* der als **on** gewertet wird
+
+  Beispielsätze:
+  > Ist die Deckenlampe im Büro eingeschaltet?\
+  > Ist das Fenster im Bad geöffnet?\
+  > Läuft die Waschmaschine?
   
 * **SetNumeric** <description>
   
