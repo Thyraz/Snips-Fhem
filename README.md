@@ -78,7 +78,7 @@ Ansonsten kann es sein, dass die Spracherkennung über das Micro des Rechners, o
 
 ## Modul Installation
 10_SNIPS.pm nach `opt/fhem/FHEM`kopieren.
-Danach FHEM neu starten.\
+Danach FHEM neu starten.
 
 Die Syntax zur Definition des Moduls sieht so aus:
 ```
@@ -91,9 +91,11 @@ Im Beispiel vom Account Namen Homer sähe ein Intent also z.B. so aus: *hermes/i
 
 * DefaultRoom weist die Snips Hauptinstanz einem Raum zu.\
 Im Gegensatz zu weiteren Snips Satellites in anderen Räumen,\
-kann die Hauptinstanz nicht umbenannt werden und heißt immer *default*.
+kann die Hauptinstanz nicht umbenannt werden und heißt immer *default*.\
 Um den Raumnamen bei einigen Befehlen weglassen zu können, sofern sie den aktuellen Raum betreffen ,\
-muss Snips eben wissen in welchem Raum man sich befindet.
+muss Snips eben wissen in welchem Raum man sich befindet.\
+Dies ermöglicht dann z.B. ein "Deckenlampe einschalten"\
+auch wenn man mehrere Geräte mit dem Alias Deckenlampe in unterschiedlichen Räumen hat.
 
 Beispiel für die Definition des MQTT Servers und Snips in FHEM:
 ```
