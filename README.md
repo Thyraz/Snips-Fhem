@@ -140,6 +140,7 @@ IntentName=currentValueReading,option1=value1,option2=value2,...
     * *valueOn* Wert von *currentValueReading* der als **on** gewertet wird
     * *cmdOn* Befehl der das Gerät einschaltet
     * *cmdOff* Befehl der das Gerät ausschaltet
+
   Beispielsätze:
   > Schalte die Deckenlampe ein\
   > Mache das Radio an\
