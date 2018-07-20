@@ -145,10 +145,10 @@ kann die Zahl über die Option *part=0* extrahiert werden.
   \
   Optionen:\
   *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.*
-    * *valueOff* Wert von *currentValueReading* der als **off** gewertet wird
-    * *valueOn* Wert von *currentValueReading* der als **on** gewertet wird
-    * *cmdOn* Befehl der das Gerät einschaltet
-    * *cmdOff* Befehl der das Gerät ausschaltet
+    * __*valueOff*__ Wert von *currentValueReading* der als **off** gewertet wird
+    * __*valueOn*__ Wert von *currentValueReading* der als **on** gewertet wird
+    * __*cmdOn*__ Befehl der das Gerät einschaltet
+    * __*cmdOff*__ Befehl der das Gerät ausschaltet
 
   Beispielsätze:
   > Schalte die Deckenlampe ein\
@@ -161,8 +161,8 @@ kann die Zahl über die Option *part=0* extrahiert werden.
   \
   Optionen:\
   *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.*
-    * *valueOff* Wert von *currentValueReading* der als **off** gewertet wird
-    * *valueOn* Wert von *currentValueReading* der als **on** gewertet wird
+    * __*valueOff*__ Wert von *currentValueReading* der als **off** gewertet wird
+    * __*valueOn*__ Wert von *currentValueReading* der als **on** gewertet wird
 
   Beispielsätze:
   > Ist die Deckenlampe im Büro eingeschaltet?\
@@ -174,12 +174,12 @@ kann die Zahl über die Option *part=0* extrahiert werden.
   Beispiel: `SetNumeric=pct,cmd=dim,minVal=0,maxVal=99,step=25`\
   \
   Optionen:
-    * *part* Splittet *currentValueReading* bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
-    * *cmd* Set-Befehl des Geräts der ausgeführt werden soll. z.B. dim
-    * *minVal* Minimal möglicher Stellwert
-    * *maxVal* Maximal möglicher Stellwert
-    * *step* Schrittweite für relative Änderungen wie z.B. *Mach die Deckenlampe heller*
-    * *map* Bisher nur ein Wert für diese Option möglich: *percent*
+    * __*part*__ Splittet *currentValueReading* bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
+    * __*cmd*__ Set-Befehl des Geräts der ausgeführt werden soll. z.B. dim
+    * __*minVal*__ Minimal möglicher Stellwert
+    * __*maxVal*__ Maximal möglicher Stellwert
+    * __*step*__ Schrittweite für relative Änderungen wie z.B. *Mach die Deckenlampe heller*
+    * __*map*__ Bisher nur ein Wert für diese Option möglich: *percent*
   
   *Erläuterung zu map=percent:\
   Ist die Option gesetzt, werden alle numerischen Stellwerte als Prozentangaben zwischen minVal und maxVal verstanden.
@@ -199,12 +199,12 @@ Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstä
 Beispiel: `GetNumeric=temperature,part=1`\
 \
 Optionen:
-  * *part*
-  * *map*
-  * *minVal*
-  * *maxVal*
+  * __*part*__
+  * __*map*__
+  * __*minVal*__
+  * __*maxVal*__
   
-Weiter Beispiele:
+Weitere Beispiele:
 
 ## Snips Installation
 
