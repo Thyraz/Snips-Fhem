@@ -134,7 +134,8 @@ Das Mapping folgt dabei dem Schema:
 IntentName=currentValueReading,option1=value1,option2=value2,...
 ```
 
-* **SetOnOff**: Intent zum Ein-/Ausschalten, Öffnen/Schließen, Starten/Stoppen, ...\
+* **SetOnOff**\
+  Intent zum Ein-/Ausschalten, Öffnen/Schließen, Starten/Stoppen, ...\
   Beispiel: `SetOnOff=brightness,valueOff=0,cmdOn=on,cmdOff=off`\
   \
   Optionen:\
@@ -149,7 +150,8 @@ IntentName=currentValueReading,option1=value1,option2=value2,...
   > Mache das Radio an\
   > Öffne den Rollladen im Wohnzimmer
 
-* **GetOnOff** <description>
+* **GetOnOff**\
+  Intent zur Zustandsabfrage von Schaltern, Kontakten, Geräten, ...
   Beispiel: `GetOnOff=reportedState,valueOff=closed`\
   \
   Optionen:\
@@ -162,9 +164,27 @@ IntentName=currentValueReading,option1=value1,option2=value2,...
   > Ist das Fenster im Bad geöffnet?\
   > Läuft die Waschmaschine?
   
-* **SetNumeric** <description>
-  
-* **GetNumeric** <description>
+* **SetNumeric**\
+Intent zum Dimmen, Lautstärke einstellen, Temperatur einstellen, ...\
+Beispiel: `SetNumeric=pct,valueOff=0,cmd=dim,minVal=0,maxVal=99,step=25`\
+\
+Optionen:\
+  * *valueOff* 
+  * *cmd*
+  * *map*
+  * *minVal*
+  * *maxVal*
+  * *step*
+
+* **GetNumeric**\
+Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstärke, ...
+Beispiel: `GetNumeric=temperature,part=1`\
+\
+Optionen:\
+  * *part*
+  * *map*
+  * *minVal*
+  * *maxVal*
 
 ## Snips Installation
 
