@@ -168,7 +168,7 @@ IntentName=currentValueReading,option1=value1,option2=value2,...
 Intent zum Dimmen, Lautstärke einstellen, Temperatur einstellen, ...\
 Beispiel: `SetNumeric=pct,valueOff=0,cmd=dim,minVal=0,maxVal=99,step=25`\
 \
-Optionen:\
+Optionen:
   * *valueOff* 
   * *cmd*
   * *map*
@@ -180,7 +180,7 @@ Optionen:\
 Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstärke, ...
 Beispiel: `GetNumeric=temperature,part=1`\
 \
-Optionen:\
+Optionen:
   * *part*
   * *map*
   * *minVal*
