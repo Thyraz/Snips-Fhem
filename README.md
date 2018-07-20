@@ -133,13 +133,24 @@ Das Mapping folgt dabei dem Schema:
 IntentName=currentValueReading,option1=value1,option2=value2,...
 ```
 
-* *SetOnOff* <description>
+* **SetOnOff**: Intent zum Ein-/Ausschalten, Öffnen/Schließen, Starten/Stoppen, ...\
+  Beispiel: `SetOnOff=brightness,valueOff=0,cmdOn=on,cmdOff=off`\
+  Optionen: *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.
+            * *valueOff* Wert von *currentValueReading* der als **off** gewertet wird
+            * *valueOn* Wert von *currentValueReading* der als **on** gewertet wird
+            * *cmdOn* Befehl der das Gerät einschaltet
+            * *cmdOff* Befehl der das Gerät ausschaltet
+  Beispielsätze:
+  > Schalte die Deckenlampe ein
+  > Mache das Radio an
+  > Öffne den Rollladen im Wohnzimmer
 
-* *GetOnOff* <description>
+
+* **GetOnOff** <description>
   
-* *SetNumeric* <description>
+* **SetNumeric** <description>
   
-* *GetNumeric* <description>
+* **GetNumeric** <description>
 
 ## Snips Installation
 
