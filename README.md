@@ -133,6 +133,11 @@ Das Mapping folgt dabei dem Schema:
 ```
 IntentName=currentValueReading,option1=value1,option2=value2,...
 ```
+currentValueReading ist dabei ein Reading, welches den aktuellen Wert des Geräts zurückspiegelt.\
+Bei einem SetOnOff Intent wären das die Werte aus den Mapping-Optionen cmdOn bzw. cmdOff.\
+Für einen SetNumeric Intent muss das Reading z.B. den aktuell per dim XX gesetzten Helligkeitswert zurückliefern.\
+Liefert das Device zusätzlich zu der benötigten Info noch eine Einheit wie z.B. `5 °C`,\
+kann die Zahl über die Option *part=0* extrahiert werden.
 
 * **SetOnOff**\
   Intent zum Ein-/Ausschalten, Öffnen/Schließen, Starten/Stoppen, ...\
@@ -166,15 +171,22 @@ IntentName=currentValueReading,option1=value1,option2=value2,...
   
 * **SetNumeric**\
 Intent zum Dimmen, Lautstärke einstellen, Temperatur einstellen, ...\
-Beispiel: `SetNumeric=pct,valueOff=0,cmd=dim,minVal=0,maxVal=99,step=25`\
+Beispiel: `SetNumeric=pct,cmd=dim,minVal=0,maxVal=99,step=25`\
 \
 Optionen:
-  * *valueOff* 
-  * *cmd*
-  * *map*
-  * *minVal*
-  * *maxVal*
-  * *step*
+  * *part* Splittet *currentValueReading* bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
+  * *cmd* Set-Befehl des Geräts der ausgeführt werden soll. z.B. dim
+  * *minVal* Minimal möglicher Stellwert
+  * *maxVal* Maximal möglicher Stellwert
+  * *step* Schrittweite für relative Änderungen wie z.B. *Mach die Deckenlampe heller*
+  * *map* Bisher nur ein Wert für diese Option möglich: *percent*
+*Erläuterung zu map=percent:*\
+*Ist die Option gesetzt, werden alle numerischen Stellwerte als Prozentangaben zwischen minVal und maxVal verstanden.\
+*Bei einer Lampe mit `minVal=0` und `maxVal=255` hat also **Stelle die Lampe auf 50**\
+das selbe Verhalten wie **Stelle die Lampe auf 50 Prozent**.\
+Dies mag bei einer Lampe mehr Sinn ergeben als Werte von 0...255 anzusagen.\
+Beim Sollwert eines Thermostats hingegen wird man die Option eher nicht nutzen,\
+da dort die Angaben normal in °C erfolgen und nicht prozentual zum möglichen Sollwertbereich.
 
 * **GetNumeric**\
 Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstärke, ...
@@ -185,6 +197,8 @@ Optionen:
   * *map*
   * *minVal*
   * *maxVal*
+  
+Weiter Beispiele:
 
 ## Snips Installation
 
