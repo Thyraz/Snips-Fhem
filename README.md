@@ -199,15 +199,19 @@ Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstä
 Beispiel: `GetNumeric=temperature,part=1`\
 \
 Optionen:
-  * __*part*__
-  * __*map*__
-  * __*minVal*__
-  * __*maxVal*__
+  * __*part*__ Splittet *currentValueReading* bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
+  * __*map*__ Siehe Beschreibung im *SetNumeric* Intent. Hier wird rückwärts gerechnet um wieder Prozent zu erhalten
+  * __*minVal*__ nur nötig bei genutzter `map` Option
+  * __*maxVal*__ nur nötig bei genutzter `map` Option
   * __*type*__ Zur Unterscheidung bei mehreren GetNumeric Intents in einem Device.\
     Zum Beispiel für die Möglichkeit getrennt eingestellter Sollwert und Ist-Temperatur von einem Thermostat abzufragen.\
     Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`
-  
-Weitere Beispiele:
+ 
+  Beispielsätze:
+  > Wie ist die Temperatur vom Thermometer im Büro?\
+  > Auf was ist das Thermostat im Bad gestellt?\
+  > Wie hell ist die Deckenlampe?\
+  > Wie laut ist das Radio im Wohnzimmer?
 
 ## Snips Installation
 
