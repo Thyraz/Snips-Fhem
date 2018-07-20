@@ -1,529 +1,360 @@
-##############################################
-#
-# FHEM snips.ai modul  http://snips.ai)
-#
-# written 2018 by Tobias Wiedenmann (Thyraz)
-# thanks to Matthias Kleine
-#
-##############################################
+# Snips-Fhem
+FHEM Modul für [snips.ai](http://snips.ai)
 
-use strict;
-use warnings;
+Danke an Matthias Kleine, der mir erlaubt hat sein MQTT Client Modul als Vorlage zu verwenden:\
+https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-part-9.html
 
-my %gets = (
-    "version" => "",
-    "status" => ""
-);
+## Inhalt
+[Über Snips](#Über-snips)\
+[Über Snips-Fhem](#Über-snips-fhem)\
+[Assistent erstellen](#assistent-erstellen)\
+[Modul Installation](#modul-installation)\
+[Geräte in FHEM für Snips sichtbar machen](#geräte-in-fhem-für-snips-sichtbar-machen)\
+[Snips Installation](#snips-installation)\
+[Erweiterungen für Snips](#erweiterungen-für-snips)
 
-my %sets = (
-    "say" => "",
-    "play" => ""
-);
+## Über Snips
+Snips ist ein Sprachassistent ähnlich Siri oder Alexa.\
+Die Besonderheit ist hier, dass Snips nach der Installation komplett Offline betrieben wird.\
+Es wir also keine Sprache zur Erkennung an einen Server im Internet geschickt.
 
-# MQTT Topics die das Modul automatisch abonniert
-my @topics = qw(
-    hermes/intent/+
-);
+Snips ist dennoch kein Sprachassistent der nur ein paar simple, eintrainierte Sätze versteht.\
+Auch bei Snips steht *Natural Language* im Vordergrund,\
+damit man sich nicht an eine feste Syntax bei den Sprachbefehlen halten muss.
 
-sub SNIPS_Initialize($) {
-    my $hash = shift @_;
+Man legt dafür im Snips Konfigurator unter https://console.snips.ai einen Account an und erstellt sich einen Assistenten indem man *Apps* erstellt oder bestehende hinzufügt.\
+Jede App kann mehrere Intents beinhalten welche Slots für bestimmte Begriffe (z.B. Gerätenamen, Räume, Schaltzustände, ...) beinhaltet.\
+Man *trainiert* die Intents dann mit verschiedensten Beispielsätzen damit der Assistent nachher möglichst gut entscheiden kann was der Nutzer von ihm will.
 
-    # Attribute snipsName und snipsRoom für andere Devices zur Verfügung abbestellen
-    addToAttrList("snipsName");
-    addToAttrList("snipsRoom");
-    addToAttrList("snipsMapping:textField-long");
+Snips kann so sehr gut verschiedene Intents unterscheiden, ohne dass diese z.B. wie bei Alexa mit ansagen muss.\
+Es ist also nicht wie bei Alexa Custom Skills nötig eine Frage so zu bilden:
+> Alexa, frage SmartHome wie viele Fenster sind geöffnet?
 
-    # Consumer
-    $hash->{DefFn} = "SNIPS::Define";
-    $hash->{UndefFn} = "SNIPS::Undefine";
-    $hash->{SetFn} = "SNIPS::Set";
-    $hash->{AttrFn} = "SNIPS::Attr";
-    $hash->{AttrList} = "IODev defaultRoom " . $main::readingFnAttributes;
-    $hash->{OnMessageFn} = "SNIPS::onmessage";
+Sondern kann die Frage direkt aussprechen:
+> Hey Snips, wieviele Fenster sind geöffnet.
 
-    main::LoadModule("MQTT");
-}
+Das verbessert die Akzeptanz einer Sprachsteuerung durch die anderen Familienmitglieder zumindest hier enorm.
 
-package SNIPS;
+Wenn man seinen Assistent fertig konfiguriert hat, kann man ihn als Zip Datei herunterladen und in die Snips Installation einspielen.\
+Ab da funktioniert die Spracherkennung lokal auf dem System.
 
-use strict;
-use warnings;
-use POSIX;
-use GPUtils qw(:all);
-use JSON;
-use Net::MQTT::Constants;
-use Encode;
+## Über Snips-Fhem
+Snips besteht aus mehreren Modulen (Hot-Word Detection, Texterkennung, Natural Language zu Intent Parser, ...)\
+All diese Module kommunizieren per MQTT miteinander.\
+Auch das resultiernde JSON Konstrukt, welches Snips am Ende ausspuckt wird über MQTT published.\
+Dieses beinhaltet den IntentNamen und die gesprochenen Wörter der einzelnen Slots. Also z.B. Gerätenamen, Raum, usw.
 
-BEGIN {
-    MQTT->import(qw(:all));
+Snips-Fhem wertet diese JSON Nachrichten aus und setzt sie entsprechend in Befehle um.\
+In die andere Richtung sendet Snips-Fhem ebenfalls Nachrichten an Snips um z.B. Antworten für TextToSpeech bereitzustellen.
 
-    GP_Import(qw(
-        devspec2array
-        CommandDeleteReading
-        CommandAttr
-        readingsSingleUpdate
-        readingsBulkUpdate
-        readingsBeginUpdate
-        readingsEndUpdate
-        Log3
-        fhem
-        defs
-        AttrVal
-        ReadingsVal
-        round
-        toJSON
-    ))
-};
+Snips-Fhem implementiert hierfür keinen eigene MQTT-Verbindung, sondern setzt dafür auf das bestehende 00_MQTT.pm Modul und meldet sich bei diesem als Client an.
 
+Es muss vor dem Snips Modul also ein MQTT Device für den Snips MQTT Server in Fhem definiert werden.
 
-# Device anlegen
-sub Define() {
-    my ($hash, $def) = @_;
-    my @args = split("[ \t]+", $def);
+## Assistent erstellen
+Account unter https://console.snips.ai erstellen und einen neuen Assistenten erstellen.
 
-    # Minimale Anzahl der nötigen Argumente vorhanden?
-    return "Invalid number of arguments: define <name> SNIPS IODev Prefix DefaultRoom" if (int(@args) < 5);
+Dort eine neue App aus dem Store hinzufügen.\
+Oben den Haken **only show apps with actions** entfernen und nach *FHEM* suchen.
 
-    my ($name, $type, $IODev, $prefix, $defaultRoom) = @args;
-    $hash->{MODULE_VERSION} = "0.1";
-    $hash->{helper}{prefix} = $prefix;
-    $hash->{helper}{defaultRoom} = $defaultRoom;
+Die App hinzufügen und danach anwählen. Hier auf *Edit App* klicken, dann auf *Fork*.\
+Nun könnt ihr in die einzelnen Intents hineinschauen und die Beispielsätze sehen.
 
-    # IODev setzen und als MQTT Client registrieren
-    $main::attr{$name}{IODev} = $IODev;
-    MQTT::Client_Define($hash, $def);
+Zusätzlich könnt ihr die Beispiel-Geräte um eure eigenen erweitern.\
+Dazu z.B. den SetOnOff Intent öffnen und beim Slot **de.fhem.Devices** auf editieren klicken.\
+Nun bekommt ihr eine Liste mit bisher von mir eingetragenen Gerätenamen.\
+Erweitert diese um eure Geräte.\
+Der vorne eingetragene Name muss später in Fhem über das Attribut *snipsName* bekannt gemacht werden.
 
-    # Benötigte MQTT Topics abonnieren
-    subscribeTopics($hash);
+Es sind auch ein oder mehrere Synonyme möglich.\
+So kann man für die Deckenlampe z.B. noch Deckenlicht und Wohnzimmerlampe eintragen.\
+Snips wird bei all diesen Bezeichnungen dann später dennoch Deckenlampe als Slot Device an FHEM übertragen.
 
-    return undef;
-};
+Wenn ihr fertig seid, drückt ihr auf Save und danach auf Deploy Assistant um das ZIP File herunterzuladen.\
+In diesem Schritt findet auch erst die finale Optimierung der Natural Language und Voice Erkennung statt.\
+Falls ihr Snips statt auf einer echten Installation erstmal im Browser unter https://console.snips.ai testen wollt,\
+solltet ihr also dennoch nach jeder Änderung einmal den Download des Assistenten anstoßen.\
+Ansonsten kann es sein, dass die Spracherkennung über das Micro des Rechners, oder die Texterkennung des eingegebenen Textes nicht richtig funktioniert.
 
+## Modul Installation
+10_SNIPS.pm nach `opt/fhem/FHEM`kopieren.
+Danach FHEM neu starten.
 
-# Device löschen
-sub Undefine($$) {
-    my ($hash, $name) = @_;
+Die Syntax zur Definition des Moduls sieht so aus:
+```
+define <name> SNIPS <Prefix> <DefaultRoom>
+```
+* *Prefix* ist euer Accountname auf https://console.snips.ai \
+Dieser wird als Prefix vor jedem Intent von Snips über MQTT mitgeschickt,\
+damit mehrere Snips Instanzen auf einem MQTT Server möglich sind.\
+Im Beispiel vom Account Namen Homer sähe ein Intent also z.B. so aus: *hermes/intent/Homer:OnOffIntent*
 
-    # MQTT Abonnements löschen
-    unsubscribeTopics($hash);
+* *DefaultRoom* weist die Snips Hauptinstanz einem Raum zu.\
+Im Gegensatz zu weiteren Snips Satellites in anderen Räumen,\
+kann die Hauptinstanz nicht umbenannt werden und heißt immer *default*.\
+Um den Raumnamen bei einigen Befehlen weglassen zu können, sofern sie den aktuellen Raum betreffen ,\
+muss Snips eben wissen in welchem Raum man sich befindet.\
+Dies ermöglicht dann z.B. ein "Deckenlampe einschalten"\
+auch wenn man mehrere Geräte mit dem Alias Deckenlampe in unterschiedlichen Räumen hat.
 
-    # Weitere Schritte an das MQTT Modul übergeben, damit man dort als Client ausgetragen wird
-    return MQTT::Client_Undefine($hash);
-}
+Beispiel für die Definition des MQTT Servers und Snips in FHEM:
+```
+define SnipsMQTT MQTT <ip-or-hostname-of-snips-machine>:1883
+define Snips SNIPS SnipsMQTT Homer Wohnzimmer
+```
 
 
-# Set Befehl aufgerufen
-sub Set($$$@) {
-    my ($hash, $name, $command, @values) = @_;
-    return "Unknown argument $command, choose one of " . join(" ", sort keys %sets) if(!defined($sets{$command}));
+## Geräte in FHEM für Snips sichtbar machen
+Damit Snips Geräte aus FHEM erkennt und auch ansprechen/abfragen kann, sind ein paar Voraussetzungen zu erfüllen:
 
-    Log3($hash->{NAME}, 5, "set " . $command . " - value: " . join (" ", @values));
+### Raum Snips
+Snips sucht nur nach Geräten, die in FHEM im Raum **Snips** liegen.\
+Also bei allen Geräten die ihr ansprechen wollt diesen Raum hinzufügen.
 
-    my $msgid;
-    my $retain = $hash->{".retain"}->{'*'};
-    my $qos = $hash->{".qos"}->{'*'};
+### Attribut *snipsName*
+Jedem Gerät in FHEM kann das Attribut **snipsName** hinzugefügt werden.\
+Snips kann Geräte anhand dieser Kriterien finden:
+* Attribut snipsName
+* Attribut alias
+* Name des Geräts in FHEM
 
-    # Say Befehl
-    if ($command eq "say") {
-        my $topic = "hermes/tts/say";
-        my $value = join (" ", @values);
+### Attribut *snipsRoom*
+Jedem Gerät in FHEM kann das Attribut **snipsRoom** hinzugefügt werden.\
+Snips kann Geräte anhand dieser Kriterien einem Raum zuordnen:
+* Attribut snipsRoom
+* Alle gewählten Räume im Attribut room
 
-        $msgid = send_publish($hash->{IODev}, topic => $topic, message => $value, qos => $qos, retain => $retain);
-        Log3($hash->{NAME}, 5, "sent (tts) '" . $value . "' to " . $topic);
-    }
+### Intents über *snipsMapping* zuordnen
+Das Snips Modul hat bisher noch keine automatische Erkennung von Intents für bestimmte Gerätetypen.\
+Es müssen also noch bei jedem Device die unterstützten Intents über ein Mapping bekannt gemacht werden.\
+Einem Gerät können mehrere Intents zugewiesen werden, dazu einfach eine Zeile pro Mapping im Attribut einfügen.
 
-    $hash->{message_ids}->{$msgid}++ if defined $msgid;
-}
+Das Mapping folgt dabei dem Schema:
+```
+IntentName=currentValueReading,option1=value1,option2=value2,...
+```
+currentValueReading ist dabei ein Reading, welches den aktuellen Wert des Geräts zurückspiegelt.\
+Bei einem SetOnOff Intent wären das die Werte aus den Mapping-Optionen cmdOn bzw. cmdOff.\
+Für einen SetNumeric Intent muss das Reading z.B. den aktuell per dim XX gesetzten Helligkeitswert zurückliefern.\
+Liefert das Device zusätzlich zu der benötigten Info noch eine Einheit wie z.B. `5 °C`,\
+kann die Zahl über die Option *part=0* extrahiert werden.
 
-# Attribute setzen / löschen
-sub Attr($$$$) {
-    my ($command, $name, $attribute, $value) = @_;
-    my $hash = $defs{$name};
+* **SetOnOff**\
+  Intent zum Ein-/Ausschalten, Öffnen/Schließen, Starten/Stoppen, ...\
+  Beispiel: `SetOnOff=brightness,valueOff=0,cmdOn=on,cmdOff=off`\
+  \
+  Optionen:\
+  *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.*
+    * __*valueOff*__ Wert von *currentValueReading* der als **off** gewertet wird
+    * __*valueOn*__ Wert von *currentValueReading* der als **on** gewertet wird
+    * __*cmdOn*__ Befehl der das Gerät einschaltet
+    * __*cmdOff*__ Befehl der das Gerät ausschaltet
 
-    # IODev Attribut gesetzt
-    if ($attribute eq "IODev") {
+  Beispielsätze:
+  > Schalte die Deckenlampe ein\
+  > Mache das Radio an\
+  > Öffne den Rollladen im Wohnzimmer
 
-        return undef;
-    }
+* **GetOnOff**\
+  Intent zur Zustandsabfrage von Schaltern, Kontakten, Geräten, ...
+  Beispiel: `GetOnOff=reportedState,valueOff=closed`\
+  \
+  Optionen:\
+  *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.*
+    * __*valueOff*__ Wert von *currentValueReading* der als **off** gewertet wird
+    * __*valueOn*__ Wert von *currentValueReading* der als **on** gewertet wird
 
-    return undef;
-}
+  Beispielsätze:
+  > Ist die Deckenlampe im Büro eingeschaltet?\
+  > Ist das Fenster im Bad geöffnet?\
+  > Läuft die Waschmaschine?
+  
+* **SetNumeric**\
+  Intent zum Dimmen, Lautstärke einstellen, Temperatur einstellen, ...\
+  Beispiel: `SetNumeric=pct,cmd=dim,minVal=0,maxVal=99,step=25`\
+  \
+  Optionen:
+    * __*part*__ Splittet *currentValueReading* bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
+    * __*cmd*__ Set-Befehl des Geräts der ausgeführt werden soll. z.B. dim
+    * __*minVal*__ Minimal möglicher Stellwert
+    * __*maxVal*__ Maximal möglicher Stellwert
+    * __*step*__ Schrittweite für relative Änderungen wie z.B. *Mach die Deckenlampe heller*
+    * __*map*__ Bisher nur ein Wert für diese Option möglich: *percent*
+  
+  *Erläuterung zu map=percent:\
+  Ist die Option gesetzt, werden alle numerischen Stellwerte als Prozentangaben zwischen minVal und maxVal verstanden.
+  Bei einer Lampe mit `minVal=0` und `maxVal=255` hat also **Stelle die Lampe auf 50**\
+  das selbe Verhalten wie **Stelle die Lampe auf 50 Prozent**.\
+  Dies mag bei einer Lampe mehr Sinn ergeben als Werte von 0...255 anzusagen.\
+  Beim Sollwert eines Thermostats hingegen wird man die Option eher nicht nutzen,\
+  da dort die Angaben normal in °C erfolgen und nicht prozentual zum möglichen Sollwertbereich.*
+  
+  Beispielsätze:
+  > Stelle die Deckenlampe auf 30 Prozent
+  > Mach das Radio leiser
+  > Stelle die Heizung im Büro um 2 Grad wärmer
+
+* **GetNumeric**\
+Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstärke, ...
+Beispiel: `GetNumeric=temperature,part=1`\
+\
+Optionen:
+  * __*part*__
+  * __*map*__
+  * __*minVal*__
+  * __*maxVal*__
+  * __*type*__ Kann Einfluß auf die Antwort von Snips geben. Mögliche Werte: Sollwert, Temperatur, Lautstärke, Helligkeit
+  
+Weitere Beispiele:
+
+## Snips Installation
+
+### Raspberry Pi
+ARM Installation basiert auf Raspbian Stretch
+Anleitung hier befolgen:
+https://snips.gitbook.io/documentation/installing-snips/on-a-raspberry-pi
+
+### AMD64
+Installation muss aktuell noch auf Debian Jessie erfolgen.
+
+Für die erfolgreiche Installation musste ich die non-free Packages in Apt hinzufügen:
+```
+sudo nano /etc/apt/sources.list
+```
+in jeder Zeile hinter „contrib“ „non-free“ anhängen
+
+Außerdem vor der Snips Installation diese Pakete installieren:
+```
+sudo apt-get install lsb-release apt-transport-https ca-certificates systemd systemd-sysv libttspico-utils alsa-utils
+```
+Wegen Systemd Installation danach evtl. neu booten.
+
+Dann Anleitung hier befolgen:\
+https://snips.gitbook.io/documentation/advanced-configuration/advanced-solutions
 
 
-# Topics abonnieren
-sub subscribeTopics($) {
-    my ($hash) = @_;
+### Sound Setup
+über `aplay -l` und `arecord -l` kann man sich erkannte Soundkarten und Mikrofone anzeigen lassen.\
+Hier ist jeweils die Nummer für "card" und "device" interessant.
 
-    foreach (@topics) {
-        my ($mqos, $mretain, $mtopic, $mvalue, $mcmd) = MQTT::parsePublishCmdStr($_);
-        MQTT::client_subscribe_topic($hash,$mtopic,$mqos,$mretain);
-
-        Log3($hash->{NAME}, 5, "Topic subscribed: " . $_);
-    }
-}
-
-# Topics abbestellen
-sub unsubscribeTopics($) {
-    my ($hash) = @_;
-
-    foreach (@topics) {
-        my ($mqos, $mretain, $mtopic, $mvalue, $mcmd) = MQTT::parsePublishCmdStr($_);
-        MQTT::client_unsubscribe_topic($hash,$mtopic);
-
-        Log3($hash->{NAME}, 5, "Topic unsubscribed: " . $_);
-    }
-}
-
-
-# Raum aus gesprochenem Text oder aus siteId verwenden? (siteId "default" durch Attr defaultRoom ersetzen)
-sub roomName ($$) {
-  my ($hash, $data) = @_;
-
-  my $room;
-  my $defaultRoom = $hash->{helper}{defaultRoom};
-
-  # Slot "Room" im JSON vorhanden? Sonst Raum des angesprochenen Satelites verwenden
-  if (exists($data->{'Room'})) {
-      $room = $data->{'Room'};
-  } else {
-      $room = $data->{'siteId'};
-      $room = $defaultRoom if ($room eq 'default' || !(length $room));
+Mit den Werten muss dann die Datei `/etc/asound.conf` angepasst bzw. erstellt werden:
+```
+sudo nano /etc/asound.conf
+```
+Inhalt sollte dann so aussehen:
+```
+pcm.!default {
+  type asym
+  playback.pcm {
+    type plug
+    slave.pcm "hw:0,0"
   }
-
-  return $room;
+  capture.pcm {
+    type plug
+    slave.pcm "hw:1,0"
+  }
 }
+```
+Hier bei `hw:x,x` entsprechend Card und Device aus euren Listings von oben verwenden.\
+Bei dem obigen Beispiel ist die interne Soundkarte Card 0 und Device 0.\
+Das Mikrofon ist ein USB-Gerät, welches als Card 1, Device0 erkannt wurde.
+
+Mit `alsamixer`kann ein Tool zum ändern der Lautstärke gestartet werden.\
+Evtl. muss hier noch die Masterlautstärke für die Lautsprecher oder das Mikrofon erhöht werden.\
+Um die Änderungen an den Reglern dauerhaft zu machen einmal `sudo alsactl store`ausführen.
+
+### Assistent installieren
+Assistant auf https://console.snips.ai konfigurieren und runterladen.\
+Entpacktes assistant Verzeichnis als /usr/share/snips/assistant speichern
+
+Danach die Snips Services stoppen:
+```
+sudo systemctl stop "snips-*"
+```
+und wieder starten:
+```
+sudo systemctl start "snips-*"
+```
+So kann man noch überprüfen ob die Services laufen und alles ok zu sein scheint:
+```
+sudo systemctl status "snips-*"
+```
+
+Danach sollte Snips über *Hey Snips* geweckt werden können.
 
 
-# Gerät über Raum und Namen suchen
-sub getDevice($$$) {
-    my ($hash, $room, $name) = @_;
-    my $device;
-    my $devspec = "room=Snips";
-    my @devices = devspec2array($devspec);
+## Erweiterungen für Snips
 
-    # devspec2array sendet bei keinen Treffern als einziges Ergebnis den devSpec String zurück
-    return undef if (@devices == 1 && $devices[0] eq $devspec);
+### Bessere Sprachausgabe mit Amazon Polly
+#### AWS Konto erstellen 
+Konto erstellen auf aws.amazon.com\
+User & Groups Dashboard aufrufen: console.aws.amazon.com/aim \
+Links im Menu auf Groups klicken\
+Create new Group wählen und als Name polly eingeben\
+AmazonPollyFullAccess policy auswählen und Gruppe erstellen\
+Links im Menu auf Users klicken\
+Add User wählen und als Name polly eingeben und als Access Type "Programatic Access" wählen\
+Im nächsten Schritt als Gruppe die vorhin erstellte Gruppe polly anwählen\
+Achtung: Am Ende werden Access key ID und Secret access key angezeigt. Diese jetzt kopieren, da wir sie nachher zum Authorisieren brauchen.
 
-    foreach (@devices) {
-        # 2 Arrays bilden mit Namen und Räumen des Devices
-        my @names = ($_, AttrVal($_,"alias",undef), AttrVal($_,"snipsName",undef));
-        my @rooms = split(',', AttrVal($_,"room",undef));
-        push (@rooms, AttrVal($_,"snipsRoom",undef));
+#### Installation auf dem Snips Rechner
+```
+sudo apt-get install mpg123
+sudo pip3 install toml
+sudo pip3 install paho-mqtt
+sudo pip3 install boto3
+sudo pip3 install awscli
+sudo aws configure
+```
+Als Default region name `eu-central-1` eingeben\
+Als output format `json` eingeben\
+Testen in der Console:
+```
+sudo aws polly synthesize-speech --output-format mp3 --voice-id Marlene --text 'Hallo, ich kann deine neue Snips Stimme sein wenn du willst.' hello.mp3
+```
+Sollte eine hello.mp3 erstellen
 
-        # Case Insensitive schauen ob der gesuchte Name (oder besser Name und Raum) in den Arrays vorhanden ist
-        if (grep( /^$name$/i, @names)) {
-            if (!defined($device) || grep( /^$room$/i, @rooms)) {
-                $device = $_;
-            }
-        }
-    }
-    return $device;
-}
+#### Snips-TTS-Polly installieren
+Snips liefert von sich aus eine TextToSpeech Lösung aus.\
+Diese funktioniert auch komplett offline, klingt aber teilweise etwas dumpf.\
+Wer damit leben kann, dass die ausgegebene Sprache über Amazons Server geht, findet mit Polly einen natürlicher klingenden Ersatz.\
+Um sich bei AWS zu registrieren braucht man eine Kreditkarte.
 
+Das Modul cached alle von Amazon empfangenen Audiodaten unter /tmp/tss/ um wiederkehrende Texte nicht erneut von Amazon laden zu müssen.\
+Das geht erstens schneller, spart aber auch verbrauchte Zeichen im AWS Konto.\
+Polly bietet im ersten Jahr 5 Millionen Zeichen pro Monat kostenlos.\
+Danach zahlt man 4$ pro einer Million zu Sprache gewandelter Zeichen.\
+Einmal die Bibel vorlesen lassen würde somit etwas 16$ kosten. ;)\
+Für normale Sprachausgaben sollte man dank Caching mit 4$ also sehr lange auskommen.
 
-# snipsMapping parsen und gefundene Settings zurückliefern
-sub getMapping($$$$) {
-    my ($hash, $device, $intent, $type) = @_;
-    my @mappings, my $mapping;
-    my $mappingsString = AttrVal($device,"snipsMapping",undef);
+Das Snips-TTS-Polly Modul simuliert als Drop-In Ersatz das Verhalten des original Snips-TTS Moduls und lauscht auf entsprechende Anforderungen im MQTT Stream von Snips.\
+Die von Amazon empfangenen Audiodaten werden dann auch über MQTT zurück geliefert, damit die nachfolgenden Snips-Module wie gewohnt funktionieren.
 
-    # String in einzelne Mappings teilen
-    @mappings = split(/\n/, $mappingsString);
+Der von mir unten verlinkte Fork hier auf Github enthält ein paar Änderungen gegenüber dem original Snips-TTS-Polly Modul,\
+damit es auch mit Python Versionen kleiner 3.5 lauffähig ist.\
+Damit kann man das Modul auch auf Debian Jessie ohne Probleme betreiben.
 
-    foreach (@mappings) {
-        # Nur Mappings vom gesuchten Typ verwenden
-        next unless $_ =~ qr/^$intent/;
-        my %hash = split(/[,=]/, $_);
-        if (!defined($mapping) || (defined($type) && $hash{'type'} eq $type)) {
-            $mapping = \%hash;
-
-            Log3($hash->{NAME}, 5, "snipsMapping selected: $_");
-        }
-    }
-
-    return $mapping;
-}
-
-
-# JSON parsen
-sub parseJSON($$$) {
-    my ($hash, $intent, $json) = @_;
-    my $data;
-
-    # JSON Decode und Fehlerüberprüfung
-    my $decoded = eval { decode_json(encode_utf8($json)) };
-    if ($@) {
-          return undef;
-    }
-
-    # Standard-Keys auslesen
-    $data->{'probability'} = $decoded->{'intent'}{'probability'};
-    $data->{'sessionId'} = $decoded->{'sessionId'};
-    $data->{'siteId'} = $decoded->{'siteId'};
-
-    # Überprüfen ob Slot Array existiert
-    if (ref($decoded->{'slots'}) eq 'ARRAY') {
-        my @slots = @{$decoded->{'slots'}};
-
-        # Key -> Value Paare aus dem Slot Array ziehen
-        foreach my $slot (@slots) {
-            my $slotName = $slot->{'slotName'};
-            my $slotValue = $slot->{'value'}{'value'};
-
-            Log3($hash->{NAME}, 5, "Parsed value: $slotValue for slot: $slotName from JSON");
-
-            $data->{$slotName} = $slotValue;
-        }
-    }
-    return $data;
-}
-
-
-# HashRef zu JSON encoden
-sub encodeJSON($) {
-    my ($hashRef) = @_;
-    my $json;
-
-    # JSON Encode und Fehlerüberprüfung
-    $json = eval { toJSON($hashRef) };
-    if ($@) {
-          Log3($hash->{NAME}, 5, "JSON Encoding Error");
-          return undef;
-    }
-
-    return $json;
-}
-
-
-# Empfangene Daten vom MQTT Modul
-sub onmessage($$$) {
-    my ($hash, $topic, $message) = @_;
-    my $prefix = $hash->{helper}{prefix};
-
-    Log3($hash->{NAME}, 5, "received message '" . $message . "' for topic: " . $topic);
-
-    # Readings updaten
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, "lastIntentTopic", $topic);
-    readingsBulkUpdate($hash, "lastIntentPayload", $message);
-    readingsEndUpdate($hash, 1);
-
-    # hermes/intent published
-    if ($topic =~ qr/^hermes\/intent\/$prefix:/) {
-        # MQTT Pfad und Prefix vom Topic entfernen
-        (my $intent = $topic) =~ s/^hermes\/intent\/$prefix://;
-        Log3($hash->{NAME}, 5, "Intent: $intent");
-
-        # JSON parsen
-        my $data = SNIPS::parseJSON($hash, $intent, $message);
-
-        if ($intent eq 'SetOnOff') {
-            SNIPS::handleIntentSetOnOff($hash, $data);
-        } elsif ($intent eq 'GetOnOff') {
-            SNIPS::handleIntentGetOnOff($hash, $data);
-        } elsif ($intent eq 'SetNumeric') {
-            SNIPS::handleIntentSetNumeric($hash, $data);
-        } elsif ($intent eq 'GetNumeric') {
-            SNIPS::handleIntentGetNumeric($hash, $data);
-        }
-    }
-}
-
-
-# Eingehende "SetOnOff" Intents bearbeiten
-sub handleIntentSetOnOff($$) {
-    my ($hash, $data) = @_;
-    my $value, my $device, my $room;
-    my $mapping;
-    my $sendData, my $json;
-    my $response = "Da ist etwas schief gegangen.";
-
-    Log3($hash->{NAME}, 5, "handleIntentSetOnOff called");
-
-    # Mindestens Gerät und Wert müssen übergeben worden sein
-    if (exists($data->{'Device'}) && exists($data->{'Value'})) {
-        $room = roomName($hash, $data);
-        $value = $data->{'Value'};
-        $device = getDevice($hash, $room, $data->{'Device'});
-        $mapping = getMapping($hash, $device, "SetOnOff", undef);
-
-        Log3($hash->{NAME}, 5, "SetOnOff-Intent: " . $room . " " . $device . " " . $value);
-
-        # Mapping gefunden?
-        if (defined($device) && defined($mapping)) {
-            my $cmdOn  = (defined($mapping->{'cmdOn'}))  ? $mapping->{'cmdOn'}  :  "on";
-            my $cmdOff = (defined($mapping->{'cmdOff'})) ? $mapping->{'cmdOff'} : "off";
-            $value = ($value eq 'an') ? $cmdOn : $cmdOff;
-
-            $response = "Ok";
-            # Gerät schalten
-            fhem("set $device $value");
-        }
-    }
-    # Antwort erstellen und Senden
-    $sendData =  {
-        sessionId => $data->{sessionId},
-        text => $response
-    };
-
-    $json = SNIPS::encodeJSON($sendData);
-    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
-}
-
-
-# Eingehende "GetOnOff" Intents bearbeiten
-sub handleIntentGetOnOff($$) {
-    my ($hash, $data) = @_;
-    my $value, my $device, my $room, my $status;
-    my $mapping;
-    my $sendData, my $json;
-    my $response = "Da ist etwas schief gegangen.";
-    my $value;
-
-    Log3($hash->{NAME}, 5, "handleIntentGetOnOff called");
-
-    # Mindestens Gerät und Status-Art wurden übergeben
-    if (exists($data->{'Device'}) && exists($data->{'Status'})) {
-        $room = roomName($hash, $data);
-        $device = getDevice($hash, $room, $data->{'Device'});
-        $mapping = getMapping($hash, $device, "GetOnOff", undef);
-        $status = $data->{'Status'};
-
-        # Mapping gefunden?
-        if (defined($mapping)) {
-            my $reading = $mapping->{'GetOnOff'};
-            my $valueOn   = (defined($mapping->{'valueOn'}))  ? $mapping->{'valueOn'}  : undef;
-            my $valueOff  = (defined($mapping->{'valueOff'})) ? $mapping->{'valueOff'} : undef;
-            my $value = ReadingsVal($device, $reading, undef);
-
-            # Entscheiden ob $value 0 oder 1 ist
-            if (defined($valueOff)) {
-                $value = (lc($value) eq lc($valueOff)) ? 0 : 1;
-            } elsif (defined($valueOn)) {
-                $value = (lc($value) eq lc($valueOn)) ? 1 : 0;
-            } else {
-                # valueOn und valueOff sind nicht angegeben worden, alles außer "off" wird als eine 1 gewertet
-                $value = (lc($value) eq "off") ? 0 : 1;
-            }
-
-            # Antwort erstellen
-            if    ($status =~ m/^(an|aus)$/ && $value == 1) { $response = $data->{'Device'} . " ist eingeschaltet"; }
-            elsif ($status =~ m/^(an|aus)$/ && $value == 0) { $response = $data->{'Device'} . " ist ausgeschaltet"; }
-            elsif ($status =~ m/^(auf|zu)$/ && $value == 1) { $response = $data->{'Device'} . " ist geöffnet"; }
-            elsif ($status =~ m/^(auf|zu)$/ && $value == 0) { $response = $data->{'Device'} . " ist geschlossen"; }
-            elsif ($status =~ m/^(läuft|fertig)$/ && $value == 1) { $response = $data->{'Device'} . " läuft noch"; }
-            elsif ($status =~ m/^(läuft|fertig)$/ && $value == 0) { $response = $data->{'Device'} . " ist fertig"; }
-        }
-    }
-    # Antwort erstellen und Senden
-    $sendData =  {
-        sessionId => $data->{sessionId},
-        text => $response
-    };
-
-    $json = SNIPS::encodeJSON($sendData);
-    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
-}
-
-
-# Eingehende "SetNumeric" Intents bearbeiten
-sub handleIntentSetNumeric($$) {
-    my ($hash, $data) = @_;
-    my $value, my $device, my $room, my $change, my $type, my $unit;
-    my $mapping;
-    my $sendData, my $json;
-    my $validData = 0;
-    my $response = "Da ist etwas schief gegangen.";
-
-    Log3($hash->{NAME}, 5, "handleIntentSetNumeric called");
-
-    # Mindestens Device und Value angegeben -> Valid (z.B. Deckenlampe auf 20%)
-    $validData = 1 if (exists($data->{'Device'}) && exists($data->{'Value'}));
-    # Mindestens Device und Change angegeben -> Valid (z.B. Radio lauter)
-    $validData = 1 if (exists($data->{'Device'}) && exists($data->{'Change'}));
-
-    if ($validData == 1) {
-        $unit = $data->{'Unit'};
-        $type = $data->{'Type'};
-        $value = $data->{'Value'};
-        $change = $data->{'Change'};
-        $room = roomName($hash, $data);
-        $device = getDevice($hash, $room, $data->{'Device'});
-        $mapping = getMapping($hash, $device, "SetNumeric", $type);
-
-        Log3($hash->{NAME}, 5, "SetNumeric-Intent: " . $room . " " . $device . " " . $value . " " . $change . " " . $type);
-
-        # Mapping und Gerät gefunden -> Befehl ausführen
-        if (defined($mapping) && defined($mapping->{'cmd'})) {
-            my $cmd     = $mapping->{'cmd'};
-            my $reading = $mapping->{'SetNumeric'};
-            my $minVal  = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : 0; # Snips kann keine negativen Nummern bisher, daher erzwungener minVal
-            my $maxVal  = (defined($mapping->{'maxVal'})) ? $mapping->{'maxVal'} : undef;
-            my $oldVal  = ReadingsVal($device, $reading, 0);
-            my $diff    = (defined($value)) ? $value : ((defined($mapping->{'step'})) ? $mapping->{'step'} : 10);
-            my $up      = (defined($change) && ($change =~ m/^(rauf|heller|lauter|wärmer)$/)) ? 1 : 0;
-            my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent") ? 1 : 0;
-
-            # Neuen Stellwert bestimmen
-            my $newVal;
-
-            # Direkter Stellwert ("Stelle Lampe auf 50")
-            if ($unit ne "Prozent" && defined($value) && !defined($change) && !$forcePercent) {
-                $newVal = $value;
-                # Begrenzung auf evtl. gesetzte min/max Werte
-                $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
-                $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
-                $response = "Ok";
-            }
-            # Direkter Stellwert als Prozent ("Stelle Lampe auf 50 Prozent", oder "Stelle Lampe auf 50" bei $forcePercent)
-            elsif (defined($value) && (!defined($change) && ($unit eq "Prozent" ||  && $forcePercent)) && defined($minVal) && defined($maxVal)) {
-                # Wert von Prozent in Raw-Wert umrechnen
-                $newVal = $value;
-                $newVal =   0 if ($newVal <   0);
-                $newVal = 100 if ($newVal > 100);
-                $newVal = main::round((($newVal * (($maxVal - $minVal) / 100)) + $minVal), 0);
-                $response = "Ok";
-            }
-            # Stellwert um Wert x ändern ("Mache Lampe um 20 heller" oder "Mache Lampe heller")
-            elsif ($unit ne "Prozent" && defined($change) && !$forcePercent) {
-                $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
-                $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
-                $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
-                $response = "Ok";
-            }
-            # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei $forcePercent oder "Mache Lampe heller" bei $forcePercent)
-            elsif (($unit eq "Prozent" || (defined($change) && $forcePercent)) && defined($minVal) && defined($maxVal)) {
-                my $diffRaw = main::round((($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
-                $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw;
-                $newVal = $minVal if ($newVal < $minVal);
-                $newVal = $maxVal if ($newVal > $maxVal);
-                $response = "Ok";
-            }
-
-            # Stellwert senden
-            fhem("set $device $cmd $newVal") if defined($newVal);
-        }
-    }
-    # Antwort erstellen und senden
-    $sendData =  {
-        sessionId => $data->{sessionId},
-        text => $response
-    };
-
-    $json = SNIPS::encodeJSON($sendData);
-    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
-}
-
-sub handleIntentGetNumeric($$) {
-    my ($hash, $data) = @_;
-    my $value, my $device, my $room, my $type;
-    my $mapping;
-    my $sendData, my $json;
-    my $response = "Da ist etwas schief gegangen.";
-
-    if (exists($data->{'Device'}) && exists($data->{'Type'})) {
-
-    }
-}
-
-1;
+Damit snips-tts-polly den mqtt server findet muss man die Serverzeile in der Snips config */etc/snips.toml* einkommentieren:\
+Raute am Anfang der Zeile `mqtt = "localhost:1883" in Section` *[snips-common]* entfernen
+```
+sudo apt-get install git
+cd /opt
+sudo git clone https://github.com/Thyraz/snips-tts-polly.git
+cd snips-tts-polly
+```
+testweise mit `sudo ./snips-tts-polly` starten.\
+Wenn keine Fehler kommen und das Programm bis *MQTT connected* läuft kann mit __STRG+C__ abgebrochen werden.\
+Kopieren des python scripts: `sudo cp snips-tts-polly /usr/bin` \
+Kopieren des Systemd services: `sudo cp snips-tts-polly.service /etc/systemd/system/` \
+`sudo systemctl daemon-reload` \
+Dann den normalen TTS Service von Snips beenden und Polly starten:
+```
+sudo systemctl stop snips-tts
+sudo systemctl start snips-tts-polly
+```
+Nun sollten Textausgaben mit Polly erfolgen.\
+Damit das noch einen Systemstart überlebt, muss noch folgendes ausgeführt werden:
+```
+sudo systemctl disable snips-tts
+sudo systemctl enable snips-tts-polly
+```
