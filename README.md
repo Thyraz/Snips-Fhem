@@ -203,7 +203,9 @@ Optionen:
   * __*map*__
   * __*minVal*__
   * __*maxVal*__
-  * __*type*__ Kann Einfluß auf die Antwort von Snips geben. Mögliche Werte: Sollwert, Temperatur, Lautstärke, Helligkeit
+  * __*type*__ Zur Unterscheidung bei mehreren GetNumeric Intents in einem Device.\
+    Zum Beispiel für die Möglichkeit getrennt eingestellter Sollwert und Ist-Temperatur von einem Thermostat abzufragen.\
+    Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`
   
 Weitere Beispiele:
 
