@@ -84,12 +84,12 @@ Die Syntax zur Definition des Moduls sieht so aus:
 ```
 define <name> SNIPS <Prefix> <DefaultRoom>
 ```
-* Prefix ist euer Accountname auf https://console.snips.ai \
+* *Prefix* ist euer Accountname auf https://console.snips.ai \
 Dieser wird als Prefix vor jedem Intent von Snips über MQTT mitgeschickt,\
 damit mehrere Snips Instanzen auf einem MQTT Server möglich sind.\
 Im Beispiel vom Account Namen Homer sähe ein Intent also z.B. so aus: *hermes/intent/Homer:OnOffIntent*
 
-* DefaultRoom weist die Snips Hauptinstanz einem Raum zu.\
+* *DefaultRoom* weist die Snips Hauptinstanz einem Raum zu.\
 Im Gegensatz zu weiteren Snips Satellites in anderen Räumen,\
 kann die Hauptinstanz nicht umbenannt werden und heißt immer *default*.\
 Um den Raumnamen bei einigen Befehlen weglassen zu können, sofern sie den aktuellen Raum betreffen ,\
