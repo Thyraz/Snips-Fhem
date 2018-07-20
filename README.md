@@ -203,6 +203,7 @@ Optionen:
   * __*map*__
   * __*minVal*__
   * __*maxVal*__
+  * __*type*__ Kann Einfluß auf die Antwort von Snips geben. Mögliche Werte: Sollwert, Temperatur, Lautstärke, Helligkeit
   
 Weitere Beispiele:
 
