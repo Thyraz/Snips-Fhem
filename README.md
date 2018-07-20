@@ -6,7 +6,7 @@ https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-p
 
 ## Inhalt
 [Über Snips](#über-snips)\
-[Über Snips-Fhem](#Über-Snips-Fhem)\
+[Über Snips-Fhem](#über-snips-fhem)\
 [Assistent erstellen](#assistent-erstellen)\
 [Modul Installation](#modul-installation)\
 [Geräte in FHEM für Snips sichtbar machen](#geräte-in-fhem-für-snips-sichtbar-machen)\
