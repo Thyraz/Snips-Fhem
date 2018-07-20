@@ -5,8 +5,8 @@ Danke an Matthias Kleine, der mir erlaubt hat sein MQTT Client Modul als Vorlage
 https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-part-9.html
 
 ## Inhalt
-[Über Snips](#über-snips)\
-[Über Snips-Fhem](#über-snips-fhem)\
+[Über Snips](#Über-snips)\
+[Über Snips-Fhem](#Über-snips-fhem)\
 [Assistent erstellen](#assistent-erstellen)\
 [Modul Installation](#modul-installation)\
 [Geräte in FHEM für Snips sichtbar machen](#geräte-in-fhem-für-snips-sichtbar-machen)\
