@@ -111,23 +111,23 @@ Damit Snips Geräte aus FHEM erkennt und auch ansprechen/abfragen kann, sind ein
 Snips sucht nur nach Geräten, die in FHEM im Raum **Snips** liegen.\
 Also bei allen Geräten die ihr ansprechen wollt diesen Raum hinzufügen.
 
-### Attribut snipsName
+### Attribut *snipsName*
 Jedem Gerät in FHEM kann das Attribut **snipsName** hinzugefügt werden.\
 Snips kann Geräte anhand dieser Kriterien finden:
 * Attribut snipsName
 * Attribut alias
 * Name des Geräts in FHEM
 
-### Attribut snipsRoom
+### Attribut *snipsRoom*
 Jedem Gerät in FHEM kann das Attribut **snipsRoom** hinzugefügt werden.\
 Snips kann Geräte anhand dieser Kriterien einem Raum zuordnen:
 * Attribut snipsRoom
 * Alle gewählten Räume im Attribut room
 
-### Intents über snipsMapping zuordnen
+### Intents über *snipsMapping* zuordnen
 Das Snips Modul hat bisher noch keine automatische Erkennung von Intents für bestimmte Gerätetypen.\
-Es müssen also bei jedem Device die unterstützten Intents über ein Mapping bekannt gemacht werden.\
-Einem Gerät können mehrere Intents zugewiesen werden, dazu einfach eine Zeile ein Mapping im Attribut einfügen.
+Es müssen also noch bei jedem Device die unterstützten Intents über ein Mapping bekannt gemacht werden.\
+Einem Gerät können mehrere Intents zugewiesen werden, dazu einfach eine Zeile pro Mapping im Attribut einfügen.
 
 Das Mapping folgt dabei dem Schema:
 ```
@@ -170,23 +170,29 @@ kann die Zahl über die Option *part=0* extrahiert werden.
   > Läuft die Waschmaschine?
   
 * **SetNumeric**\
-Intent zum Dimmen, Lautstärke einstellen, Temperatur einstellen, ...\
-Beispiel: `SetNumeric=pct,cmd=dim,minVal=0,maxVal=99,step=25`\
-\
-Optionen:
-  * *part* Splittet *currentValueReading* bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
-  * *cmd* Set-Befehl des Geräts der ausgeführt werden soll. z.B. dim
-  * *minVal* Minimal möglicher Stellwert
-  * *maxVal* Maximal möglicher Stellwert
-  * *step* Schrittweite für relative Änderungen wie z.B. *Mach die Deckenlampe heller*
-  * *map* Bisher nur ein Wert für diese Option möglich: *percent*
-*Erläuterung zu map=percent:*\
-*Ist die Option gesetzt, werden alle numerischen Stellwerte als Prozentangaben zwischen minVal und maxVal verstanden.\
-*Bei einer Lampe mit `minVal=0` und `maxVal=255` hat also **Stelle die Lampe auf 50**\
-das selbe Verhalten wie **Stelle die Lampe auf 50 Prozent**.\
-Dies mag bei einer Lampe mehr Sinn ergeben als Werte von 0...255 anzusagen.\
-Beim Sollwert eines Thermostats hingegen wird man die Option eher nicht nutzen,\
-da dort die Angaben normal in °C erfolgen und nicht prozentual zum möglichen Sollwertbereich.
+  Intent zum Dimmen, Lautstärke einstellen, Temperatur einstellen, ...\
+  Beispiel: `SetNumeric=pct,cmd=dim,minVal=0,maxVal=99,step=25`\
+  \
+  Optionen:
+    * *part* Splittet *currentValueReading* bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
+    * *cmd* Set-Befehl des Geräts der ausgeführt werden soll. z.B. dim
+    * *minVal* Minimal möglicher Stellwert
+    * *maxVal* Maximal möglicher Stellwert
+    * *step* Schrittweite für relative Änderungen wie z.B. *Mach die Deckenlampe heller*
+    * *map* Bisher nur ein Wert für diese Option möglich: *percent*
+  
+  *Erläuterung zu map=percent:\
+  Ist die Option gesetzt, werden alle numerischen Stellwerte als Prozentangaben zwischen minVal und maxVal verstanden.
+  Bei einer Lampe mit `minVal=0` und `maxVal=255` hat also **Stelle die Lampe auf 50**\
+  das selbe Verhalten wie **Stelle die Lampe auf 50 Prozent**.\
+  Dies mag bei einer Lampe mehr Sinn ergeben als Werte von 0...255 anzusagen.\
+  Beim Sollwert eines Thermostats hingegen wird man die Option eher nicht nutzen,\
+  da dort die Angaben normal in °C erfolgen und nicht prozentual zum möglichen Sollwertbereich.*
+  
+  Beispielsätze:
+  > Stelle die Deckenlampe auf 30 Prozent
+  > Mach das Radio leiser
+  > Stelle die Heizung im Büro um 2 Grad wärmer
 
 * **GetNumeric**\
 Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstärke, ...
