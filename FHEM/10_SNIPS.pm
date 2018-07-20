@@ -52,6 +52,7 @@ use POSIX;
 use GPUtils qw(:all);
 use JSON;
 use Net::MQTT::Constants;
+use Encode;
 
 BEGIN {
     MQTT->import(qw(:all));
@@ -70,6 +71,7 @@ BEGIN {
         AttrVal
         ReadingsVal
         round
+        toJSON
     ))
 };
 
@@ -249,7 +251,7 @@ sub parseJSON($$$) {
     my $data;
 
     # JSON Decode und Fehlerüberprüfung
-    my $decoded = eval { decode_json($json) };
+    my $decoded = eval { decode_json(encode_utf8($json)) };
     if ($@) {
           return undef;
     }
@@ -277,14 +279,15 @@ sub parseJSON($$$) {
 }
 
 
-# HashRef zu JSON ecnoden
+# HashRef zu JSON encoden
 sub encodeJSON($) {
     my ($hashRef) = @_;
     my $json;
 
     # JSON Encode und Fehlerüberprüfung
-    my $json = eval { encode_json($hashRef) };
+    $json = eval { toJSON($hashRef) };
     if ($@) {
+          Log3($hash->{NAME}, 5, "JSON Encoding Error");
           return undef;
     }
 
@@ -458,22 +461,22 @@ sub handleIntentSetNumeric($$) {
             my $maxVal  = (defined($mapping->{'maxVal'})) ? $mapping->{'maxVal'} : undef;
             my $oldVal  = ReadingsVal($device, $reading, 0);
             my $diff    = (defined($value)) ? $value : ((defined($mapping->{'step'})) ? $mapping->{'step'} : 10);
-            my $up      = (defined($change) && ($change =~ m/^(rauf|heller|lauter)$/)) ? 1 : 0;
-            my $isPercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent") ? 1 : 0;
+            my $up      = (defined($change) && ($change =~ m/^(rauf|heller|lauter|wärmer)$/)) ? 1 : 0;
+            my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent") ? 1 : 0;
 
             # Neuen Stellwert bestimmen
             my $newVal;
 
-            # Direkter Stellwert
-            if ($unit ne "Prozent" && defined($value) && !defined($change) && !$isPercent) {
+            # Direkter Stellwert ("Stelle Lampe auf 50")
+            if ($unit ne "Prozent" && defined($value) && !defined($change) && !$forcePercent) {
                 $newVal = $value;
                 # Begrenzung auf evtl. gesetzte min/max Werte
                 $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
                 $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
                 $response = "Ok";
             }
-            # Direkter Stellwert als Prozent
-            elsif (defined($value) && ($unit eq "Prozent" || (!defined($change) && $isPercent)) && defined($minVal) && defined($maxVal)) {
+            # Direkter Stellwert als Prozent ("Stelle Lampe auf 50 Prozent", oder "Stelle Lampe auf 50" bei $forcePercent)
+            elsif (defined($value) && (!defined($change) && ($unit eq "Prozent" ||  && $forcePercent)) && defined($minVal) && defined($maxVal)) {
                 # Wert von Prozent in Raw-Wert umrechnen
                 $newVal = $value;
                 $newVal =   0 if ($newVal <   0);
@@ -481,15 +484,15 @@ sub handleIntentSetNumeric($$) {
                 $newVal = main::round((($newVal * (($maxVal - $minVal) / 100)) + $minVal), 0);
                 $response = "Ok";
             }
-            # Stellwert um Wert x ändern
-            elsif ($unit ne "Prozent" && defined($change) && !$isPercent) {
+            # Stellwert um Wert x ändern ("Mache Lampe um 20 heller" oder "Mache Lampe heller")
+            elsif ($unit ne "Prozent" && defined($change) && !$forcePercent) {
                 $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
                 $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
                 $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
                 $response = "Ok";
             }
-            # Stellwert um Prozent x ändern
-            elsif (($unit eq "Prozent" || (defined($change) && $isPercent)) && defined($minVal) && defined($maxVal)) {
+            # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei $forcePercent oder "Mache Lampe heller" bei $forcePercent)
+            elsif (($unit eq "Prozent" || (defined($change) && $forcePercent)) && defined($minVal) && defined($maxVal)) {
                 my $diffRaw = main::round((($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
                 $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw;
                 $newVal = $minVal if ($newVal < $minVal);
