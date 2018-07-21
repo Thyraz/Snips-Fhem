@@ -18,10 +18,6 @@ Snips ist ein Sprachassistent ähnlich Siri oder Alexa.\
 Die Besonderheit ist hier, dass Snips nach der Installation komplett Offline betrieben wird.\
 Es wir also keine Sprache zur Erkennung an einen Server im Internet geschickt.
 
-Snips ist dennoch kein Sprachassistent der nur ein paar simple, eintrainierte Sätze versteht.\
-Auch bei Snips steht *Natural Language* im Vordergrund,\
-damit man sich nicht an eine feste Syntax bei den Sprachbefehlen halten muss.
-
 Man legt dafür im Snips Konfigurator unter https://console.snips.ai einen Account an und erstellt sich einen Assistenten indem man *Apps* erstellt oder bestehende hinzufügt.\
 Jede App kann mehrere Intents beinhalten welche Slots für bestimmte Begriffe (z.B. Gerätenamen, Räume, Schaltzustände, ...) beinhaltet.\
 Man *trainiert* die Intents dann mit verschiedensten Beispielsätzen damit der Assistent nachher möglichst gut entscheiden kann was der Nutzer von ihm will.
@@ -32,8 +28,6 @@ Es ist also nicht wie bei Alexa Custom Skills nötig eine Frage so zu bilden:
 
 Sondern kann die Frage direkt aussprechen:
 > Hey Snips, wieviele Fenster sind geöffnet.
-
-Das verbessert die Akzeptanz einer Sprachsteuerung durch die anderen Familienmitglieder zumindest hier enorm.
 
 Wenn man seinen Assistent fertig konfiguriert hat, kann man ihn als Zip Datei herunterladen und in die Snips Installation einspielen.\
 Ab da funktioniert die Spracherkennung lokal auf dem System.
