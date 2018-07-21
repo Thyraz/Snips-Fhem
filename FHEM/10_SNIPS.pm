@@ -536,9 +536,18 @@ sub handleIntentGetNumeric($$) {
             my $value = ReadingsVal($device, $reading, undef);
             my $minVal  = $mapping->{'minVal'};
             my $maxVal  = $mapping->{'maxVal'};
+            my $mappingType = $mapping->{'type'};
             my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent") ? 1 : 0;
 
-            $response = $data->{'Device'} . " hat den Wert $value";
+            # Antwort erstellen falls type aus Intent matched
+            if    ($type =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
+            elsif ($type eq "Temperatur") { $response = "Die Temperatur von " . $data->{'Device'} . " beträgt $value Grad."; }
+            elsif ($type eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . $data->{'Device'} . " beträgt $value Prozent."; }
+
+            # Antwort überschreiben falls mappingType matched
+            if    ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
+            elsif ($mappingType eq "Temperatur") { $response = "Die Temperatur von " . $data->{'Device'} . " beträgt $value Grad."; }
+            elsif ($mappingType eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . $data->{'Device'} . " beträgt $value Prozent."; }
         }
     }
     # Antwort erstellen und senden
