@@ -288,7 +288,7 @@ Danach sollte Snips über *Hey Snips* geweckt werden können.
 ### Bessere Sprachausgabe mit Amazon Polly
 #### AWS Konto erstellen 
 Konto erstellen auf aws.amazon.com\
-User & Groups Dashboard aufrufen: console.aws.amazon.com/aim \
+User & Groups Dashboard aufrufen: https://console.aws.amazon.com/iam/home \
 Links im Menu auf Groups klicken\
 Create new Group wählen und als Name polly eingeben\
 AmazonPollyFullAccess policy auswählen und Gruppe erstellen\
@@ -342,9 +342,9 @@ cd /opt
 sudo git clone https://github.com/Thyraz/snips-tts-polly.git
 cd snips-tts-polly
 ```
-testweise mit `sudo ./snips-tts-polly` starten.\
+testweise mit `sudo ./snips-tts-polly.py` starten.\
 Wenn keine Fehler kommen und das Programm bis *MQTT connected* läuft kann mit __STRG+C__ abgebrochen werden.\
-Kopieren des python scripts: `sudo cp snips-tts-polly /usr/bin` \
+Kopieren des python scripts: `sudo cp snips-tts-polly.py /usr/bin` \
 Kopieren des Systemd services: `sudo cp snips-tts-polly.service /etc/systemd/system/` \
 `sudo systemctl daemon-reload` \
 Dann den normalen TTS Service von Snips beenden und Polly starten:
