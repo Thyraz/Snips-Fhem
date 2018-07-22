@@ -456,16 +456,22 @@ sub handleIntentSetNumeric($$) {
         if (defined($mapping) && defined($mapping->{'cmd'})) {
             my $cmd     = $mapping->{'cmd'};
             my $reading = $mapping->{'SetNumeric'};
+            my $part = $mapping->{'part'};
             my $minVal  = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : 0; # Snips kann keine negativen Nummern bisher, daher erzwungener minVal
             my $maxVal  = $mapping->{'maxVal'};
-            my $oldVal  = ReadingsVal($device, $reading, 0);
             my $diff    = (defined($value)) ? $value : ((defined($mapping->{'step'})) ? $mapping->{'step'} : 10);
             my $up      = (defined($change) && ($change =~ m/^(rauf|heller|lauter|wärmer)$/)) ? 1 : 0;
             my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent") ? 1 : 0;
 
-            # Neuen Stellwert bestimmen
-            my $newVal;
+            # Alten Wert bestimmen
+            my $oldVal  = ReadingsVal($device, $reading, 0);
+            if (defined($part)) {
+              my @tokens = split(/ /, $oldVal);
+              $oldVal = @tokens[$part] if (@tokens >= $part);
+            }
 
+            # Neuen Wert bestimmen
+            my $newVal;
             # Direkter Stellwert ("Stelle Lampe auf 50")
             if ($unit ne "Prozent" && defined($value) && !defined($change) && !$forcePercent) {
                 $newVal = $value;
@@ -531,23 +537,31 @@ sub handleIntentGetNumeric($$) {
         $device = getDevice($hash, $room, $data->{'Device'});
         $mapping = getMapping($hash, $device, "GetNumeric", $type);
 
+        # Mapping gefunden
         if (defined($mapping)) {
             my $reading = $mapping->{'GetNumeric'};
-            my $value = ReadingsVal($device, $reading, undef);
+            my $part = $mapping->{'part'};
             my $minVal  = $mapping->{'minVal'};
             my $maxVal  = $mapping->{'maxVal'};
             my $mappingType = $mapping->{'type'};
-            my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent") ? 1 : 0;
+            my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent" && defined($minVal) && defined($maxVal)) ? 1 : 0;
 
-            # Antwort erstellen falls type aus Intent matched
-            if    ($type =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
-            elsif ($type eq "Temperatur") { $response = "Die Temperatur von " . $data->{'Device'} . " beträgt $value Grad."; }
-            elsif ($type eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . $data->{'Device'} . " beträgt $value Prozent."; }
+            # Zurückzuliefernden Wert bestimmen
+            $value = ReadingsVal($device, $reading, undef);
+            if (defined($part)) {
+              my @tokens = split(/ /, $value);
+              $value = @tokens[$part] if (@tokens >= $part);
+            }
+            $value =  main::round((($value * (($maxVal - $minVal) / 100)) + $minVal), 0) if ($forcePercent);
 
-            # Antwort überschreiben falls mappingType matched
+            # Antwort falls mappingType matched
             if    ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
             elsif ($mappingType eq "Temperatur") { $response = "Die Temperatur von " . $data->{'Device'} . " beträgt $value Grad."; }
             elsif ($mappingType eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . $data->{'Device'} . " beträgt $value Prozent."; }
+            # Antwort falls type aus Intent matched
+            elsif ($type =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
+            elsif ($type eq "Temperatur") { $response = "Die Temperatur von " . $data->{'Device'} . " beträgt $value Grad."; }
+            elsif ($type eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . $data->{'Device'} . " beträgt $value Prozent."; }
         }
     }
     # Antwort erstellen und senden
