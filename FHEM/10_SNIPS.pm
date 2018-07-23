@@ -38,7 +38,7 @@ sub SNIPS_Initialize($) {
     $hash->{UndefFn} = "SNIPS::Undefine";
     $hash->{SetFn} = "SNIPS::Set";
     $hash->{AttrFn} = "SNIPS::Attr";
-    $hash->{AttrList} = "IODev defaultRoom " . $main::readingFnAttributes;
+    $hash->{AttrList} = "IODev defaultRoom snipsIntents:textField-long " . $main::readingFnAttributes;
     $hash->{OnMessageFn} = "SNIPS::onmessage";
 
     main::LoadModule("MQTT");
