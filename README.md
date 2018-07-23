@@ -76,7 +76,7 @@ Danach FHEM neu starten.
 
 Die Syntax zur Definition des Moduls sieht so aus:
 ```
-define <name> SNIPS <DefaultRoom>
+define <name> SNIPS <MqttDevice> <DefaultRoom>
 ```
 
 * *DefaultRoom* weist die Snips Hauptinstanz einem Raum zu.\
