@@ -76,12 +76,8 @@ Danach FHEM neu starten.
 
 Die Syntax zur Definition des Moduls sieht so aus:
 ```
-define <name> SNIPS <Prefix> <DefaultRoom>
+define <name> SNIPS <DefaultRoom>
 ```
-* *Prefix* ist euer Accountname auf https://console.snips.ai \
-Dieser wird als Prefix vor jedem Intent von Snips über MQTT mitgeschickt,\
-damit mehrere Snips Instanzen auf einem MQTT Server möglich sind.\
-Im Beispiel vom Account Namen Homer sähe ein Intent also z.B. so aus: *hermes/intent/Homer:OnOffIntent*
 
 * *DefaultRoom* weist die Snips Hauptinstanz einem Raum zu.\
 Im Gegensatz zu weiteren Snips Satellites in anderen Räumen,\
