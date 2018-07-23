@@ -82,11 +82,10 @@ sub Define() {
     my @args = split("[ \t]+", $def);
 
     # Minimale Anzahl der nötigen Argumente vorhanden?
-    return "Invalid number of arguments: define <name> SNIPS IODev Prefix DefaultRoom" if (int(@args) < 5);
+    return "Invalid number of arguments: define <name> SNIPS IODev DefaultRoom" if (int(@args) < 4);
 
-    my ($name, $type, $IODev, $prefix, $defaultRoom) = @args;
-    $hash->{MODULE_VERSION} = "0.1";
-    $hash->{helper}{prefix} = $prefix;
+    my ($name, $type, $IODev, $defaultRoom) = @args;
+    $hash->{MODULE_VERSION} = "0.2";
     $hash->{helper}{defaultRoom} = $defaultRoom;
 
     # IODev setzen und als MQTT Client registrieren
@@ -301,7 +300,6 @@ sub encodeJSON($) {
 # Empfangene Daten vom MQTT Modul
 sub onmessage($$$) {
     my ($hash, $topic, $message) = @_;
-    my $prefix = $hash->{helper}{prefix};
 
     Log3($hash->{NAME}, 5, "received message '" . $message . "' for topic: " . $topic);
 
@@ -312,9 +310,9 @@ sub onmessage($$$) {
     readingsEndUpdate($hash, 1);
 
     # hermes/intent published
-    if ($topic =~ qr/^hermes\/intent\/$prefix:/) {
+    if ($topic =~ qr/^hermes\/intent\/.*:/) {
         # MQTT Pfad und Prefix vom Topic entfernen
-        (my $intent = $topic) =~ s/^hermes\/intent\/$prefix://;
+        (my $intent = $topic) =~ s/^hermes\/intent\/.*.://;
         Log3($hash->{NAME}, 5, "Intent: $intent");
 
         # JSON parsen
