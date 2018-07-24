@@ -326,10 +326,41 @@ sub onmessage($$$) {
             SNIPS::handleIntentSetNumeric($hash, $data);
         } elsif ($intent eq 'GetNumeric') {
             SNIPS::handleIntentGetNumeric($hash, $data);
+        } else {
+            SNIPS::handelCustomIntent($hash, $intent, $data);
         }
     }
 }
 
+
+# Eingehender Custom-Intent
+sub handelCustomIntent($$$) {
+    my ($hash, $intentName, $data) = @_;
+    my @intents, my $intent;
+    my $intentsString = AttrVal($hash->{NAME},"snipsIntents",undef);
+    my $sendData, my $json;
+    my $response = "Da ist etwas schief gegangen.";
+
+    Log3($hash->{NAME}, 5, "handleCustomIntent called");
+
+    # String in einzelne Mappings teilen
+    @intents = split(/\n/, $intentsString);
+
+    foreach (@intents) {
+        # Nur Mappings vom gesuchten Typ verwenden
+        next unless $_ =~ qr/^$intentName/;
+
+        Log3($hash->{NAME}, 5, "snipsIntent selected: $_");
+    }
+    # Antwort erstellen und Senden
+    $sendData =  {
+        sessionId => $data->{sessionId},
+        text => $response
+    };
+
+    $json = SNIPS::encodeJSON($sendData);
+    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+}
 
 # Eingehende "SetOnOff" Intents bearbeiten
 sub handleIntentSetOnOff($$) {
@@ -350,13 +381,15 @@ sub handleIntentSetOnOff($$) {
 
         # Mapping gefunden?
         if (defined($device) && defined($mapping)) {
+            my $error;
             my $cmdOn  = (defined($mapping->{'cmdOn'}))  ? $mapping->{'cmdOn'}  :  "on";
             my $cmdOff = (defined($mapping->{'cmdOff'})) ? $mapping->{'cmdOff'} : "off";
             $value = ($value eq 'an') ? $cmdOn : $cmdOff;
 
             $response = "Ok";
             # Gerät schalten
-            fhem("set $device $value");
+            $error = AnalyzeCommand($hash, "set $device $value");
+            Log3($hash->{NAME}, 1, $error) if (defined($error));
         }
     }
     # Antwort erstellen und Senden
@@ -452,6 +485,7 @@ sub handleIntentSetNumeric($$) {
 
         # Mapping und Gerät gefunden -> Befehl ausführen
         if (defined($mapping) && defined($mapping->{'cmd'})) {
+            my $error;
             my $cmd     = $mapping->{'cmd'};
             my $reading = $mapping->{'SetNumeric'};
             my $part = $mapping->{'part'};
@@ -504,7 +538,8 @@ sub handleIntentSetNumeric($$) {
             }
 
             # Stellwert senden
-            fhem("set $device $cmd $newVal") if defined($newVal);
+            $error = AnalyzeCommand($hash, "set $device $cmd $newVal") if defined($newVal);
+            Log3($hash->{NAME}, 1, $error) if (defined($error));
         }
     }
     # Antwort erstellen und senden
