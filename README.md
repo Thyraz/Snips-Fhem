@@ -335,7 +335,7 @@ damit es auch mit Python Versionen kleiner 3.5 lauffähig ist.\
 Damit kann man das Modul auch auf Debian Jessie ohne Probleme betreiben.
 
 Damit snips-tts-polly den mqtt server findet muss man die Serverzeile in der Snips config */etc/snips.toml* einkommentieren:\
-Raute am Anfang der Zeile `mqtt = "localhost:1883" in Section` *[snips-common]* entfernen
+Raute am Anfang der Zeile `mqtt = "localhost:1883"` in Section *[snips-common]* entfernen
 ```
 sudo apt-get install git
 cd /opt
