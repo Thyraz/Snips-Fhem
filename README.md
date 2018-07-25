@@ -29,6 +29,10 @@ Es ist also nicht wie bei Alexa Custom Skills nötig eine Frage so zu bilden:
 Sondern kann die Frage direkt aussprechen:
 > Hey Snips, wieviele Fenster sind geöffnet.
 
+Snips unterstüzt "Satelliten" um weitere Räume anzubinden.
+Dies können z.B. weitere Raspberry Pi mit Mikrofon und einen kleinen Lautsprecher sein.
+Die Software für die Satelliten benötigt keine schnelle Hardware, kann also auch ein Pi Zero sein.
+
 Wenn man seinen Assistent fertig konfiguriert hat, kann man ihn als Zip Datei herunterladen und in die Snips Installation einspielen.\
 Ab da funktioniert die Spracherkennung lokal auf dem System.
 
