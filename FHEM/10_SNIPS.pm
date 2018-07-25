@@ -359,7 +359,7 @@ sub handleCustomIntent($$$) {
     # Custom Intent Definition Parsen
     if ($intent =~ qr/^$intentName=.*\(.*\)/) {
         my @tokens = split(/=|\(|\)/, $intent);
-        my $subName =  @tokens[1] if (@tokens > 0);
+        my $subName =  "main::" . @tokens[1] if (@tokens > 0);
         my @paramNames = split(/,/, @tokens[2]) if (@tokens > 1);
 
         if (defined($subName)) {
@@ -374,7 +374,7 @@ sub handleCustomIntent($$$) {
             };
 
             if ($@) {
-                Log3($hash->{NAME}, 5, "Error calling $subName: $@");
+                Log3($hash->{NAME}, 5, $@);
             }
         }
     }
