@@ -72,6 +72,8 @@ BEGIN {
         ReadingsVal
         round
         toJSON
+        AnalyzeCommand
+        AnalyzePerlCommand
     ))
 };
 
@@ -297,7 +299,7 @@ sub encodeJSON($) {
 }
 
 
-# Empfangene Daten vom MQTT Modul
+# Daten vom MQTT Modul empfangen
 sub onmessage($$$) {
     my ($hash, $topic, $message) = @_;
 
@@ -318,6 +320,7 @@ sub onmessage($$$) {
         # JSON parsen
         my $data = SNIPS::parseJSON($hash, $intent, $message);
 
+        # Passenden Intent-Handler aufrufen
         if ($intent eq 'SetOnOff') {
             SNIPS::handleIntentSetOnOff($hash, $data);
         } elsif ($intent eq 'GetOnOff') {
@@ -327,32 +330,56 @@ sub onmessage($$$) {
         } elsif ($intent eq 'GetNumeric') {
             SNIPS::handleIntentGetNumeric($hash, $data);
         } else {
-            SNIPS::handelCustomIntent($hash, $intent, $data);
+            SNIPS::handleCustomIntent($hash, $intent, $data);
         }
     }
 }
 
 
 # Eingehender Custom-Intent
-sub handelCustomIntent($$$) {
+sub handleCustomIntent($$$) {
     my ($hash, $intentName, $data) = @_;
     my @intents, my $intent;
     my $intentsString = AttrVal($hash->{NAME},"snipsIntents",undef);
     my $sendData, my $json;
-    my $response = "Da ist etwas schief gegangen.";
+    my $response;
+    my $error;
 
     Log3($hash->{NAME}, 5, "handleCustomIntent called");
 
-    # String in einzelne Mappings teilen
+    # Suchen ob ein passender Custom Intent existiert
     @intents = split(/\n/, $intentsString);
-
     foreach (@intents) {
-        # Nur Mappings vom gesuchten Typ verwenden
         next unless $_ =~ qr/^$intentName/;
 
+        $intent = $_;
         Log3($hash->{NAME}, 5, "snipsIntent selected: $_");
     }
+
+    # Custom Intent Definition Parsen
+    if ($intent =~ qr/^$intentName=.*\(.*\)/) {
+        my @tokens = split(/=|\(|\)/, $intent);
+        my $subName =  "main::" . @tokens[1] if (@tokens > 0);
+        my @paramNames = split(/,/, @tokens[2]) if (@tokens > 1);
+
+        if (defined($subName)) {
+            my @params = map { $data->{$_} } @paramNames;
+
+            # Sub aus dem Custom Intent aufrufen
+            eval {
+                Log3($hash->{NAME}, 5, "Calling sub: $subName");
+
+                no strict 'refs';
+                $response = $subName->(@params);
+            };
+
+            if ($@) {
+                Log3($hash->{NAME}, 5, $@);
+            }
+        }
+    }
     # Antwort erstellen und Senden
+    $response = "Da ist etwas schief gegangen." if (!defined($response));
     $sendData =  {
         sessionId => $data->{sessionId},
         text => $response
@@ -361,6 +388,7 @@ sub handelCustomIntent($$$) {
     $json = SNIPS::encodeJSON($sendData);
     MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
 }
+
 
 # Eingehende "SetOnOff" Intents bearbeiten
 sub handleIntentSetOnOff($$) {
@@ -591,7 +619,7 @@ sub handleIntentGetNumeric($$) {
             if    ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
             elsif ($mappingType eq "Temperatur") { $response = "Die Temperatur von " . $data->{'Device'} . " beträgt $value Grad."; }
             elsif ($mappingType eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . $data->{'Device'} . " beträgt $value Prozent."; }
-            # Antwort falls type aus Intent matched
+            # Andernfalls Antwort falls type aus Intent matched
             elsif ($type =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
             elsif ($type eq "Temperatur") { $response = "Die Temperatur von " . $data->{'Device'} . " beträgt $value Grad."; }
             elsif ($type eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . $data->{'Device'} . " beträgt $value Prozent."; }
