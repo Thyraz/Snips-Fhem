@@ -248,7 +248,7 @@ sub snipsAbfall($) {
 	
     if ($type eq "Restmüll") {
         # Wert aus Reading lesen
-        my $days = ReadingsVal("MyAbfallDevice","Restmuell_days, undef);
+        my $days = ReadingsVal("MyAbfallDevice","Restmuell_days", undef);
         # Antwort überschreiben mit dem Ergebnis
         $response = "Der Restmüll wird in $days abgeholt";
     }
