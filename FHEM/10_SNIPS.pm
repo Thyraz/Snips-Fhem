@@ -199,7 +199,7 @@ sub roomName ($$) {
 
 
 # Gerät über Raum und Namen suchen
-sub getDevice($$$) {
+sub getDeviceByName($$$) {
     my ($hash, $room, $name) = @_;
     my $device;
     my $devspec = "room=Snips";
@@ -217,6 +217,34 @@ sub getDevice($$$) {
         # Case Insensitive schauen ob der gesuchte Name (oder besser Name und Raum) in den Arrays vorhanden ist
         if (grep( /^$name$/i, @names)) {
             if (!defined($device) || grep( /^$room$/i, @rooms)) {
+                $device = $_;
+            }
+        }
+    }
+    return $device;
+}
+
+# Gerät über Raum, Intent und Type suchen
+sub getDeviceByType($$$$) {
+    my ($hash, $room, $intent, $type) = @_;
+    my $device;
+    my $devspec = "room=Snips";
+    my @devices = devspec2array($devspec);
+
+    # devspec2array sendet bei keinen Treffern als einziges Ergebnis den devSpec String zurück
+    return undef if (@devices == 1 && $devices[0] eq $devspec);
+
+    foreach (@devices) {
+        # Array bilden mit Räumen des Devices
+        my @rooms = split(',', AttrVal($_,"room",undef));
+        push (@rooms, AttrVal($_,"snipsRoom",undef));
+        my $mapping = SNIPS::getMapping($hash, $_, $intent, $type);
+        my $mappingType = $mapping->{'type'};
+
+        # Schauen ob der Type aus dem Mapping der gesuchte ist und der Raum stimmt
+        if (defined($mappingType) && $mappingType eq $type) {
+            Log3($hash->{NAME}, 5, "Device mit passendem mappingType: $_");
+            if (grep( /^$room$/i, @rooms)) {
                 $device = $_;
             }
         }
@@ -404,7 +432,7 @@ sub handleIntentSetOnOff($$) {
     if (exists($data->{'Device'}) && exists($data->{'Value'})) {
         $room = roomName($hash, $data);
         $value = $data->{'Value'};
-        $device = getDevice($hash, $room, $data->{'Device'});
+        $device = getDeviceByName($hash, $room, $data->{'Device'});
         $mapping = getMapping($hash, $device, "SetOnOff", undef);
 
         # Mapping gefunden?
@@ -445,7 +473,7 @@ sub handleIntentGetOnOff($$) {
     # Mindestens Gerät und Status-Art wurden übergeben
     if (exists($data->{'Device'}) && exists($data->{'Status'})) {
         $room = roomName($hash, $data);
-        $device = getDevice($hash, $room, $data->{'Device'});
+        $device = getDeviceByName($hash, $room, $data->{'Device'});
         $mapping = getMapping($hash, $device, "GetOnOff", undef);
         $status = $data->{'Status'};
 
@@ -508,7 +536,7 @@ sub handleIntentSetNumeric($$) {
         $value = $data->{'Value'};
         $change = $data->{'Change'};
         $room = roomName($hash, $data);
-        $device = getDevice($hash, $room, $data->{'Device'});
+        $device = getDeviceByName($hash, $room, $data->{'Device'});
         $mapping = getMapping($hash, $device, "SetNumeric", $type);
 
         # Mapping und Gerät gefunden -> Befehl ausführen
@@ -591,12 +619,19 @@ sub handleIntentGetNumeric($$) {
 
     Log3($hash->{NAME}, 5, "handleIntentGetNumeric called");
 
-    # Mindestens Gerät und Type müssen existieren
-    if (exists($data->{'Device'}) && exists($data->{'Type'})) {
+    # Mindestens Type muss existieren
+    if (exists($data->{'Type'})) {
         $type = $data->{'Type'};
         $room = roomName($hash, $data);
-        $device = getDevice($hash, $room, $data->{'Device'});
-        $mapping = getMapping($hash, $device, "GetNumeric", $type);
+
+        # Passendes Gerät suchen
+        if (exists($data->{'Device'})) {
+            $device = getDeviceByName($hash, $room, $data->{'Device'});
+        } else {
+            $device = getDeviceByType($hash, $room, "GetNumeric", $type);
+        }
+
+        $mapping = getMapping($hash, $device, "GetNumeric", $type) if (defined($device));
 
         # Mapping gefunden
         if (defined($mapping)) {
@@ -615,14 +650,17 @@ sub handleIntentGetNumeric($$) {
             }
             $value =  main::round((($value * (($maxVal - $minVal) / 100)) + $minVal), 0) if ($forcePercent);
 
+            # Punkt durch Komma ersetzen in Dezimalzahlen
+            $value =~ s/\./\,/g;
+
             # Antwort falls mappingType matched
             if    ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
-            elsif ($mappingType eq "Temperatur") { $response = "Die Temperatur von " . $data->{'Device'} . " beträgt $value Grad."; }
-            elsif ($mappingType eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . $data->{'Device'} . " beträgt $value Prozent."; }
+            elsif ($mappingType eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value Grad."; }
+            elsif ($mappingType eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value Prozent."; }
             # Andernfalls Antwort falls type aus Intent matched
             elsif ($type =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
-            elsif ($type eq "Temperatur") { $response = "Die Temperatur von " . $data->{'Device'} . " beträgt $value Grad."; }
-            elsif ($type eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . $data->{'Device'} . " beträgt $value Prozent."; }
+            elsif ($type eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value Grad."; }
+            elsif ($type eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value Prozent."; }
         }
     }
     # Antwort erstellen und senden
