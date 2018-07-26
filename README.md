@@ -10,6 +10,7 @@ https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-p
 [Assistent erstellen](#assistent-erstellen)\
 [Modul Installation](#modul-installation)\
 [Geräte in FHEM für Snips sichtbar machen](#geräte-in-fhem-für-snips-sichtbar-machen)\
+
 [Anhang 1: Snips Installation](#snips-installation)\
 [Anhang 2: Erweiterungen für Snips](#erweiterungen-für-snips)
 
@@ -206,6 +207,58 @@ Optionen:
   > Auf was ist das Thermostat im Bad gestellt?\
   > Wie hell ist die Deckenlampe?\
   > Wie laut ist das Radio im Wohnzimmer?
+
+## Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren
+
+### Was ist damit möglich
+Eigene Intents ermöglichen es euch Snips weitere Sätze / Fragen beizubringen und in diesen auch eigene Slots mit möglichen Begriffen zu verwenden.\
+Ein mögliches Beispiel wäre die Einbindung des Abfall Moduls in den Sprachassistent.\
+Mit Beispielsätzen wie *Wann wird der Restmüll abgeholt* die einen Slot *Type* (mögliche Werte z.B. Restmüll, Biomüll, Gelber Sack) beinhalten wird Snips der neue Intent *Abfall* beigebracht.\
+
+### Einen Intent für Snips erstellen
+Intents werden auf https://console.snips.ai konfiguriert.\
+Es empfiehlt sich für eure Custom Intents in Snips eine extra App anzulegen anstatt die FHEM App dafür zu forken und diese dort abzulegen.\
+Eine bebilderte Anleitung zum Erstellen eines Intents, der zugehörigen Slots und den Beispielsätzen findet ihr hier:\
+https://snips.gitbook.io/documentation/console/set-intents#create-a-new-intent
+
+### Anfragen zum Custom Intent in Fhem entgegen nehmen
+Wird der Satz von Snips erkannt, erhält FHEM als Intent Name *Abfall* geliefert und für den Slot **Type** den Begriff aus dem Slot.\
+Im Snips Modul in FHEM kann einem Intent dann über das Attribut **snipsIntents** eine Perl Funktion z.B. aus 99_myUtils.pm zugewiesen werden.\
+Pro Intent wird hier eine neue Zeile hinzugefügt. Diese hat folgenden Syntax:
+```
+IntentName=nameDerFunktion(SlotName1,SlotName2,...)
+```
+Für unseren Abfall Intent könnte da so aussehen (die Perl Funktion müsste *snipsAbfall* heißen und würde einen Parameter übergeben bekommen:
+```
+Abfall=snipsAbfall(Type)
+```
+Die Perl Funktionen können einen Text zurückliefern, welcher dann von Snips als Antwort ausgegeben wird.\
+Hier ein Beispiel passend zum oben erstellten Intent:
+```
+# Abfall Intent
+sub snipsAbfall($) {
+	# Übergebene Parameter in Variablen speichern
+	my $type = @_;
+	
+	# Standardantwort festlegen
+	my $response = "Das kann ich leider nicht beantworten";
+	
+	if ($type eq "Restmüll") {
+    # Wert aus Reading lesen
+    my $days = ReadingsVal("MyAbfallDevice","Restmuell_days, undef);
+		# Antwort überschreiben mit dem Ergebnis
+		$response = "Der Restmüll wird in $days abgeholt";
+	}
+	
+	# Antwort an das Snipsmodul zurück geben
+	return $response;
+}
+```
+
+### Troubleshooting
+Solltet ihr keine Antwort von Snips bekommen, einfach Verbose im Snips Device auf 5 setzen.\
+Ihr solltet dann im Log sehen welcher Intent erkannt wurde und welche Slots mit welchen Werten belegt sind.\
+Gibt es Fehler beim Aufruf der Perl Funktion sollte man dies hier auch sehen.
 
 ## Snips Installation
 
