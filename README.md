@@ -240,21 +240,21 @@ Hier ein Beispiel passend zum oben erstellten Intent:
 ```
 # Abfall Intent
 sub snipsAbfall($) {
-	# Übergebene Parameter in Variablen speichern
-	my $type = @_;
+    # Übergebene Parameter in Variablen speichern
+    my $type = @_;
 	
-	# Standardantwort festlegen
-	my $response = "Das kann ich leider nicht beantworten";
+    # Standardantwort festlegen
+    my $response = "Das kann ich leider nicht beantworten";
 	
-	if ($type eq "Restmüll") {
-    # Wert aus Reading lesen
-    my $days = ReadingsVal("MyAbfallDevice","Restmuell_days, undef);
-		# Antwort überschreiben mit dem Ergebnis
-		$response = "Der Restmüll wird in $days abgeholt";
-	}
+    if ($type eq "Restmüll") {
+        # Wert aus Reading lesen
+        my $days = ReadingsVal("MyAbfallDevice","Restmuell_days, undef);
+        # Antwort überschreiben mit dem Ergebnis
+        $response = "Der Restmüll wird in $days abgeholt";
+    }
 	
-	# Antwort an das Snipsmodul zurück geben
-	return $response;
+    # Antwort an das Snipsmodul zurück geben
+    return $response;
 }
 ```
 
