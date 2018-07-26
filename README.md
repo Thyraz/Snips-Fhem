@@ -10,7 +10,7 @@ https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-p
 [Assistent erstellen](#assistent-erstellen)\
 [Modul Installation](#modul-installation)\
 [Geräte in FHEM für Snips sichtbar machen](#geräte-in-fhem-für-snips-sichtbar-machen)\
-
+[Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren](#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren)\
 [Anhang 1: Snips Installation](#snips-installation)\
 [Anhang 2: Erweiterungen für Snips](#erweiterungen-für-snips)
 
@@ -211,19 +211,22 @@ Optionen:
 ## Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren
 
 ### Was ist damit möglich
-Eigene Intents ermöglichen es euch Snips weitere Sätze / Fragen beizubringen und in diesen auch eigene Slots mit möglichen Begriffen zu verwenden.\
+Eigene Intents ermöglichen es euch Snips weitere Sätze / Fragen beizubringen\
+und in diesen auch eigene Slots mit möglichen Begriffen zu verwenden.\
 Ein mögliches Beispiel wäre die Einbindung des Abfall Moduls in den Sprachassistent.\
-Mit Beispielsätzen wie *Wann wird der Restmüll abgeholt* die einen Slot *Type* (mögliche Werte z.B. Restmüll, Biomüll, Gelber Sack) beinhalten wird Snips der neue Intent *Abfall* beigebracht.\
+Mit Beispielsätzen wie *Wann wird der Restmüll abgeholt*,\
+welche einen Slot *Type* (mögliche Werte z.B. Restmüll, Biomüll, Gelber Sack) beinhalten wird Snips der neue Intent *Abfall* beigebracht.
 
 ### Einen Intent für Snips erstellen
 Intents werden auf https://console.snips.ai konfiguriert.\
-Es empfiehlt sich für eure Custom Intents in Snips eine extra App anzulegen anstatt die FHEM App dafür zu forken und diese dort abzulegen.\
+Es empfiehlt sich für eure Custom Intents in Snips eine extra App anzulegen,\
+anstatt die FHEM App dafür zu forken und diese darin abzulegen.\
 Eine bebilderte Anleitung zum Erstellen eines Intents, der zugehörigen Slots und den Beispielsätzen findet ihr hier:\
 https://snips.gitbook.io/documentation/console/set-intents#create-a-new-intent
 
 ### Anfragen zum Custom Intent in Fhem entgegen nehmen
-Wird der Satz von Snips erkannt, erhält FHEM als Intent Name *Abfall* geliefert und für den Slot **Type** den Begriff aus dem Slot.\
-Im Snips Modul in FHEM kann einem Intent dann über das Attribut **snipsIntents** eine Perl Funktion z.B. aus 99_myUtils.pm zugewiesen werden.\
+Wird der Satz von Snips erkannt, erhält FHEM als Intent-Name *Abfall* geliefert und für den Slot **Type** den Begriff aus dem Slot.\
+Im Snips Modul in FHEM kann einem Intent dann über das Attribut __*snipsIntents*__ eine Perl Funktion z.B. aus 99_myUtils.pm zugewiesen werden.\
 Pro Intent wird hier eine neue Zeile hinzugefügt. Diese hat folgenden Syntax:
 ```
 IntentName=nameDerFunktion(SlotName1,SlotName2,...)
@@ -254,6 +257,9 @@ sub snipsAbfall($) {
 	return $response;
 }
 ```
+
+Ein weiteres Beispiel findet sich hier im Forum:\
+https://forum.fhem.de/index.php/topic,89548.msg821359.html#msg821359
 
 ### Troubleshooting
 Solltet ihr keine Antwort von Snips bekommen, einfach Verbose im Snips Device auf 5 setzen.\
