@@ -211,11 +211,11 @@ Optionen:
 ## Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren
 
 ### Was ist damit möglich
-Eigene Intents ermöglichen es euch Snips weitere Sätze / Fragen beizubringen\
-und in diesen auch eigene Slots mit möglichen Begriffen zu verwenden.\
+Eigene Intents ermöglichen es euch Snips weitere Sätze / Fragen beizubringen.\
+In iesen könnt Ihr auch eigene Slots mit möglichen Begriffen anlegen.\
 Ein mögliches Beispiel wäre die Einbindung des Abfall Moduls in den Sprachassistent.\
-Mit Beispielsätzen wie *Wann wird der Restmüll abgeholt*,\
-welche einen Slot *Type* (mögliche Werte z.B. Restmüll, Biomüll, Gelber Sack) beinhalten wird Snips der neue Intent *Abfall* beigebracht.
+Snips wird ein neuer Intent *Abfall* beigebracht, mit Beispielsätzen wie *Wann wird der Restmüll abgeholt*.\ 
+Dieser kann dann einen Slot *Type* beinhalten mit verschiedenen Werte wie z.B. Restmüll, Biomüll, Gelber Sack).
 
 ### Einen Intent für Snips erstellen
 Intents werden auf https://console.snips.ai konfiguriert.\
