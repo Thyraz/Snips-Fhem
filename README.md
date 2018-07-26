@@ -214,7 +214,7 @@ Optionen:
 Eigene Intents ermöglichen es euch Snips weitere Sätze / Fragen beizubringen.\
 In diesen könnt Ihr auch eigene Slots mit möglichen Begriffen anlegen.\
 Ein mögliches Beispiel wäre die Einbindung des Abfall Moduls in den Sprachassistent.\
-Snips wird ein neuer Intent *Abfall* beigebracht, mit Beispielsätzen wie *Wann wird der Restmüll abgeholt*. \ 
+Snips wird ein neuer Intent *Abfall* beigebracht, mit Beispielsätzen wie *Wann wird der Restmüll abgeholt*.\
 Dieser kann dann einen Slot *Type* beinhalten mit verschiedenen Werte wie z.B. Restmüll, Biomüll, Gelber Sack).
 
 ### Einen Intent für Snips erstellen
