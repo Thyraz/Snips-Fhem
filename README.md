@@ -274,7 +274,7 @@ Anleitung hier befolgen:
 https://snips.gitbook.io/documentation/installing-snips/on-a-raspberry-pi
 
 ### AMD64
-Installation muss aktuell noch auf Debian Jessie erfolgen.
+Installation muss aktuell neuerdings auf __Debian Stretch__ erfolgen.
 
 Für die erfolgreiche Installation musste ich die non-free Packages in Apt hinzufügen:
 ```
