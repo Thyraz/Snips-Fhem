@@ -241,7 +241,7 @@ Hier ein Beispiel passend zum oben erstellten Intent:
 # Abfall Intent
 sub snipsAbfall($) {
     # Übergebene Parameter in Variablen speichern
-    my $type = @_;
+    my ($type) = @_;
 	
     # Standardantwort festlegen
     my $response = "Das kann ich leider nicht beantworten";
