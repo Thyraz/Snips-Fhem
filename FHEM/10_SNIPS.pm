@@ -17,7 +17,8 @@ my %gets = (
 
 my %sets = (
     "say" => "",
-    "play" => ""
+    "play" => "",
+    "updateModel" => ""
 );
 
 # MQTT Topics die das Modul automatisch abonniert
@@ -74,6 +75,7 @@ BEGIN {
         toJSON
         AnalyzeCommand
         AnalyzePerlCommand
+        looks_like_number
     ))
 };
 
@@ -135,6 +137,33 @@ sub Set($$$@) {
 
         $json = SNIPS::encodeJSON($sendData);
         MQTT::send_publish($hash->{IODev}, topic => 'hermes/tts/say', message => $json, qos => 0, retain => "0");
+    }
+    # Update Model Befehl
+    elsif ($command eq "updateModel") {
+        my @names, my @rooms;
+        my %namesHash, my %roomsHash;
+        my $devspec = "room=Snips";
+        my @devices = devspec2array($devspec);
+
+        # Alle SnipsNames und SnipsRooms sammeln
+        foreach (@devices) {
+            push @names, AttrVal($_,"snipsName",undef);
+            push @rooms, AttrVal($_,"snipsRoom",undef);
+        }
+
+        # Doubletten rausfiltern
+        %namesHash   = map { if (defined($_)) { $_, 1 } else { () } } @names;
+        %roomsHash   = map { if (defined($_)) { $_, 1 } else { () } } @rooms;
+        @names = keys %namesHash;
+        @rooms = keys %roomsHash;
+
+        foreach (@names) {
+            Log3($hash->{NAME}, 5, "Name: " . $_);
+        }
+
+        foreach (@rooms) {
+            Log3($hash->{NAME}, 5, "Room: " . $_);
+        }
     }
 }
 
@@ -266,7 +295,7 @@ sub getMapping($$$$) {
         # Nur Mappings vom gesuchten Typ verwenden
         next unless $_ =~ qr/^$intent/;
         my %hash = split(/[,=]/, $_);
-        if (!defined($mapping) || (defined($type) && $hash{'type'} eq $type)) {
+        if (!defined($mapping) || (defined($type) && $mapping->{'type'} ne $type && $hash{'type'} eq $type)) {
             $mapping = \%hash;
 
             Log3($hash->{NAME}, 5, "snipsMapping selected: $_");
@@ -537,6 +566,14 @@ sub handleIntentSetNumeric($$) {
         $change = $data->{'Change'};
         $room = roomName($hash, $data);
         $device = getDeviceByName($hash, $room, $data->{'Device'});
+
+        # Type nicht belegt -> versuchen Type über change Value zu bestimmen
+        if (!defined($type) && defined($change)) {
+            if    ($change =~ m/^(kälter|wärmer)$/)  { $type = "Temperatur"; }
+            elsif ($change =~ m/^(dunkler|heller)$/) { $type = "Helligkeit"; }
+            elsif ($change =~ m/^(lauter|leiser)$/)  { $type = "Lautstärke"; }
+        }
+
         $mapping = getMapping($hash, $device, "SetNumeric", $type);
 
         # Mapping und Gerät gefunden -> Befehl ausführen
@@ -657,10 +694,13 @@ sub handleIntentGetNumeric($$) {
             if    ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
             elsif ($mappingType eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value Grad."; }
             elsif ($mappingType eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value Prozent."; }
+            elsif ($mappingType eq "Batterie") { $response = "Der Batteriestand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . (main::looks_like_number($value) ?  " beträgt $value Prozent" : " ist $value"); }
+
             # Andernfalls Antwort falls type aus Intent matched
             elsif ($type =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
             elsif ($type eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value Grad."; }
             elsif ($type eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value Prozent."; }
+            elsif ($type eq "Batterie") { $response = "Der Batteriestand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . (main::looks_like_number($value) ?  " beträgt $value Prozent" : " ist $value"); }
         }
     }
     # Antwort erstellen und senden
