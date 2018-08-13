@@ -260,7 +260,10 @@ sub getMapping($$$$) {
     foreach (@mappings) {
         # Nur Mappings vom gesuchten Typ verwenden
         next unless $_ =~ qr/^$intent/;
+
+        $_ =~ s/$intent://;
         my %hash = split(/[,=]/, $_);
+
         if (!defined($mapping) || (defined($type) && $mapping->{'type'} ne $type && $hash{'type'} eq $type)) {
             $mapping = \%hash;
 
@@ -537,7 +540,7 @@ sub handleIntentGetOnOff($$) {
 
         # Mapping gefunden?
         if (defined($mapping)) {
-            my $reading = $mapping->{'GetOnOff'};
+            my $reading = $mapping->{'currentVal'};
             my $valueOn   = (defined($mapping->{'valueOn'}))  ? $mapping->{'valueOn'}  : undef;
             my $valueOff  = (defined($mapping->{'valueOff'})) ? $mapping->{'valueOff'} : undef;
             my $value = ReadingsVal($device, $reading, undef);
@@ -609,7 +612,7 @@ sub handleIntentSetNumeric($$) {
         if (defined($mapping) && defined($mapping->{'cmd'})) {
             my $error;
             my $cmd     = $mapping->{'cmd'};
-            my $reading = $mapping->{'SetNumeric'};
+            my $reading = $mapping->{'currentVal'};
             my $part = $mapping->{'part'};
             my $minVal  = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : 0; # Snips kann keine negativen Nummern bisher, daher erzwungener minVal
             my $maxVal  = $mapping->{'maxVal'};
@@ -701,7 +704,7 @@ sub handleIntentGetNumeric($$) {
 
         # Mapping gefunden
         if (defined($mapping)) {
-            my $reading = $mapping->{'GetNumeric'};
+            my $reading = $mapping->{'currentVal'};
             my $part = $mapping->{'part'};
             my $minVal  = $mapping->{'minVal'};
             my $maxVal  = $mapping->{'maxVal'};
