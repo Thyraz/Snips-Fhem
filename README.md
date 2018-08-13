@@ -54,24 +54,12 @@ Es muss vor dem Snips Modul also ein MQTT Device für den Snips MQTT Server in F
 Account unter https://console.snips.ai erstellen und einen neuen Assistenten erstellen.
 
 Dort eine neue App aus dem Store hinzufügen.\
-Oben den Haken **only show apps with actions** entfernen und nach *FHEM* suchen.
+Oben den Haken **only show apps with actions** entfernen und nach *FHEM* suchen.\
+Dann die App hinzufügen.
 
-Die App hinzufügen und danach anwählen. Hier auf *Edit App* klicken, dann auf *Fork*.\
-Nun könnt ihr in die einzelnen Intents hineinschauen und die Beispielsätze sehen.
-
-Zusätzlich könnt ihr die Beispiel-Geräte um eure eigenen erweitern.\
-Dazu z.B. den SetOnOff Intent öffnen und beim Slot **de.fhem.Devices** auf editieren klicken.\
-Nun bekommt ihr eine Liste mit bisher von mir eingetragenen Gerätenamen.\
-Erweitert diese um eure Geräte.\
-Der vorne eingetragene Name muss später in Fhem über das Attribut *snipsName* bekannt gemacht werden.
-
-Es sind auch ein oder mehrere Synonyme möglich.\
-So kann man für die Deckenlampe z.B. noch Deckenlicht und Wohnzimmerlampe eintragen.\
-Snips wird bei all diesen Bezeichnungen dann später dennoch Deckenlampe als Slot Device an FHEM übertragen.
-
-Wenn ihr fertig seid, drückt ihr auf Save und danach auf Deploy Assistant um das ZIP File herunterzuladen.\
+Wenn ihr fertig seid, drückt ihr auf auf Deploy Assistant um das ZIP File herunterzuladen.\
 In diesem Schritt findet auch erst die finale Optimierung der Natural Language und Voice Erkennung statt.\
-Falls ihr Snips statt auf einer echten Installation erstmal im Browser unter https://console.snips.ai testen wollt,\
+Falls ihr euren Assistenten statt auf einer echten Installation erstmal im Browser unter https://console.snips.ai testen wollt,\
 solltet ihr also dennoch nach jeder Änderung einmal den Download des Assistenten anstoßen.\
 Ansonsten kann es sein, dass die Spracherkennung über das Micro des Rechners, oder die Texterkennung des eingegebenen Textes nicht richtig funktioniert.
 
@@ -100,7 +88,10 @@ define Snips SNIPS SnipsMQTT Homer Wohnzimmer
 
 
 ## Geräte in FHEM für Snips sichtbar machen
-__Wichtig:__ nach all den nachfolgenden Änderungen muss immer ein ```set <snipsDevice> modelUpdate``` ausgeführt werden.
+__Wichtig:__ Nach all den nachfolgenden Änderungen muss immer ein ```set <snipsDevice> modelUpdate``` ausgeführt werden.\
+Dadurch wird das Vokabular von Snips z.B. um eure Geräte- und Raumnamen erweitert.\
+Dies muss ebenfall ausgeführt werden nachdem eine neue Version eureres Assistenten (manuell oder über *sam install assistant*) installiert wurde,\
+da hier die nachträglich durch FHEM angelernten Worte wieder verloren gehen.
 
 Damit Snips Geräte aus FHEM erkennt und auch ansprechen/abfragen kann, sind ein paar Voraussetzungen zu erfüllen:
 
@@ -272,7 +263,7 @@ Wenn Snips eure Geräte- oder Raumnamen nicht versteht,\
 wurde evtl. das ASR Inject Paket nicht installiert:\
 [Installation ASR Injection](#wichtig-asr-injection-installieren)
 
-Sollte Snips nach dem Hinzufügen neuer Geräte, oder dem ändern von snipsName oder snipsRoom das Gerät nicht erkennen,\
+Sollte Snips nach Aktualisierung eures Assistenten, dem Hinzufügen neuer Geräte, oder dem Ändern von snipsName oder snipsRoom Attributen Geräte- oder Raumbezeichnungen nicht mehr verstehen,\
 bitte sicherstellen, dass ```set <snipsDevice> modelUpdate``` ausgeführt wurde.
 
 ## Snips Installation
@@ -283,7 +274,7 @@ Anleitung hier befolgen:
 https://snips.gitbook.io/documentation/installing-snips/on-a-raspberry-pi
 
 ### AMD64
-Installation muss aktuell neuerdings auf __Debian Stretch__ erfolgen.
+Installation muss aktuell auf __Debian Stretch__ erfolgen.
 
 Für die erfolgreiche Installation musste ich die non-free Packages in Apt hinzufügen:
 ```
