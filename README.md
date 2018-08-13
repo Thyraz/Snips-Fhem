@@ -121,9 +121,9 @@ Das Mapping folgt dabei dem Schema:
 ```
 IntentName:option1=value1,option2=value2,...
 ```
-Bei einigen Intents gibt es die currentVal Option, bei der das Reading angegeben wird,\
-aus dem der aktuelle Wert ausgelesen werden kann.\
-Für einen GetNumeric Intent kann das z.B. das Reading welches den aktuell per dim XX gesetzten Helligkeitswert zurückliefert sein.\
+Bei einigen Intents gibt es die Option *currentVal*,\
+bei der das Reading angegeben wird aus dem der aktuelle Wert ausgelesen werden kann.\
+Für einen GetNumeric Intent kann das z.B. das Reading sein, welches den aktuell gesetzten Helligkeitswert zurückliefert.\
 Liefert das Device zusätzlich zu der benötigten Info noch eine Einheit wie z.B. `5 °C`,\
 kann die Zahl über die Option *part=0* extrahiert werden.\
 Details dazu in den folgenden Beschreibungen der einzelnen Intents.
