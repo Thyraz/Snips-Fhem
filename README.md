@@ -100,6 +100,8 @@ define Snips SNIPS SnipsMQTT Homer Wohnzimmer
 
 
 ## Geräte in FHEM für Snips sichtbar machen
+__Wichtig:__ nach all den nachfolgenden Änderungen muss immer ein ```set <snipsDevice> modelUpdate``` ausgeführt werden.
+
 Damit Snips Geräte aus FHEM erkennt und auch ansprechen/abfragen kann, sind ein paar Voraussetzungen zu erfüllen:
 
 ### Raum Snips
@@ -269,6 +271,9 @@ Gibt es Fehler beim Aufruf der Perl Funktion sollte man dies hier auch sehen.
 Wenn Snips eure Geräte- oder Raumnamen nicht versteht,\
 wurde evtl. das ASR Inject Paket nicht installiert:\
 [Installation ASR Injection](#wichtig-asr-injection-installieren)
+
+Sollte Snips nach dem Hinzufügen neuer Geräte, oder dem ändern von snipsName oder snipsRoom das Gerät nicht erkennen,\
+bitte sicherstellen, dass ```set <snipsDevice> modelUpdate``` ausgeführt wurde.
 
 ## Snips Installation
 
