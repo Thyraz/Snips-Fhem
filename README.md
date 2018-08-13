@@ -119,17 +119,18 @@ Einem Gerät können mehrere Intents zugewiesen werden, dazu einfach eine Zeile 
 
 Das Mapping folgt dabei dem Schema:
 ```
-IntentName=currentValueReading,option1=value1,option2=value2,...
+IntentName:option1=value1,option2=value2,...
 ```
-currentValueReading ist dabei ein Reading, welches den aktuellen Wert des Geräts zurückspiegelt.\
-Bei einem SetOnOff Intent wären das die Werte aus den Mapping-Optionen cmdOn bzw. cmdOff.\
-Für einen SetNumeric Intent muss das Reading z.B. den aktuell per dim XX gesetzten Helligkeitswert zurückliefern.\
+Bei einigen Intents gibt es die currentVal Option, bei der das Reading angegeben wird,\
+aus dem der aktuelle Wert ausgelesen werden kann.\
+Für einen GetNumeric Intent kann das z.B. das Reading welches den aktuell per dim XX gesetzten Helligkeitswert zurückliefert sein.\
 Liefert das Device zusätzlich zu der benötigten Info noch eine Einheit wie z.B. `5 °C`,\
-kann die Zahl über die Option *part=0* extrahiert werden.
+kann die Zahl über die Option *part=0* extrahiert werden.\
+Details dazu in den folgenden Beschreibungen der einzelnen Intents.
 
 * **SetOnOff**\
   Intent zum Ein-/Ausschalten, Öffnen/Schließen, Starten/Stoppen, ...\
-  Beispiel: `SetOnOff=brightness,valueOff=0,cmdOn=on,cmdOff=off`\
+  Beispiel: `SetOnOff:valueOff=0,cmdOn=on,cmdOff=off`\
   \
   Optionen:\
   *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.*
@@ -145,12 +146,13 @@ kann die Zahl über die Option *part=0* extrahiert werden.
 
 * **GetOnOff**\
   Intent zur Zustandsabfrage von Schaltern, Kontakten, Geräten, ...
-  Beispiel: `GetOnOff=reportedState,valueOff=closed`\
+  Beispiel: `GetOnOff:currentVal=state,valueOff=closed`\
   \
   Optionen:\
   *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.*
-    * __*valueOff*__ Wert von *currentValueReading* der als **off** gewertet wird
-    * __*valueOn*__ Wert von *currentValueReading* der als **on** gewertet wird
+    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann
+    * __*valueOff*__ Wert von *currentVal* Reading der als **off** gewertet wird
+    * __*valueOn*__ Wert von *currentVal* Reading der als **on** gewertet wird
 
   Beispielsätze:
   > Ist die Deckenlampe im Büro eingeschaltet?\
@@ -159,9 +161,10 @@ kann die Zahl über die Option *part=0* extrahiert werden.
   
 * **SetNumeric**\
   Intent zum Dimmen, Lautstärke einstellen, Temperatur einstellen, ...\
-  Beispiel: `SetNumeric=pct,cmd=dim,minVal=0,maxVal=99,step=25`\
+  Beispiel: `SetNumeric:currentVal=pct,cmd=dim,minVal=0,maxVal=99,step=25`\
   \
   Optionen:
+    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann
     * __*part*__ Splittet *currentValueReading* bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
     * __*cmd*__ Set-Befehl des Geräts der ausgeführt werden soll. z.B. dim
     * __*minVal*__ Minimal möglicher Stellwert
@@ -184,9 +187,10 @@ kann die Zahl über die Option *part=0* extrahiert werden.
 
 * **GetNumeric**\
 Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstärke, ...
-Beispiel: `GetNumeric=temperature,part=1`\
+Beispiel: `GetNumeric:currentVal=temperature,part=1`\
 \
 Optionen:
+  * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann
   * __*part*__ Splittet *currentValueReading* bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
   * __*map*__ Siehe Beschreibung im *SetNumeric* Intent. Hier wird rückwärts gerechnet um wieder Prozent zu erhalten
   * __*minVal*__ nur nötig bei genutzter `map` Option
