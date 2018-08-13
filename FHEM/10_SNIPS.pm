@@ -122,48 +122,14 @@ sub Set($$$@) {
 
     Log3($hash->{NAME}, 5, "set " . $command . " - value: " . join (" ", @values));
 
-    # Say Befehl
+    # Say Cmd
     if ($command eq "say") {
         my $text = join (" ", @values);
-        my $sendData, my $json;
-
-        $sendData =  {
-            siteId => "default",
-            text => $text,
-            lang => "de",
-            id => "0",
-            sessionId => "0"
-        };
-
-        $json = SNIPS::encodeJSON($sendData);
-        MQTT::send_publish($hash->{IODev}, topic => 'hermes/tts/say', message => $json, qos => 0, retain => "0");
+        SNIPS::say($hash,$text);
     }
-    # Update Model Befehl
+    # Update Model Cmd
     elsif ($command eq "updateModel") {
-        my @names, my @rooms;
-        my %namesHash, my %roomsHash;
-        my $devspec = "room=Snips";
-        my @devices = devspec2array($devspec);
-
-        # Alle SnipsNames und SnipsRooms sammeln
-        foreach (@devices) {
-            push @names, AttrVal($_,"snipsName",undef);
-            push @rooms, AttrVal($_,"snipsRoom",undef);
-        }
-
-        # Doubletten rausfiltern
-        %namesHash   = map { if (defined($_)) { $_, 1 } else { () } } @names;
-        %roomsHash   = map { if (defined($_)) { $_, 1 } else { () } } @rooms;
-        @names = keys %namesHash;
-        @rooms = keys %roomsHash;
-
-        foreach (@names) {
-            Log3($hash->{NAME}, 5, "Name: " . $_);
-        }
-
-        foreach (@rooms) {
-            Log3($hash->{NAME}, 5, "Room: " . $_);
-        }
+        SNIPS::updateModel($hash);
     }
 }
 
@@ -389,6 +355,69 @@ sub onmessage($$$) {
         } else {
             SNIPS::handleCustomIntent($hash, $intent, $data);
         }
+    }
+}
+
+
+# Sprachausgabe / TTS über SNIPS
+sub say($$) {
+    my ($hash, $text) = @_;
+    my $sendData, my $json;
+
+    $sendData =  {
+        siteId => "default",
+        text => $text,
+        lang => "de",
+        id => "0",
+        sessionId => "0"
+    };
+
+    $json = SNIPS::encodeJSON($sendData);
+    MQTT::send_publish($hash->{IODev}, topic => 'hermes/tts/say', message => $json, qos => 0, retain => "0");
+}
+
+
+# Update vom Sips Model / ASR Injection
+sub updateModel($) {
+    my @devices, my @rooms;
+    my %devicesHash, my %roomsHash;
+    my $devspec = "room=Snips";
+    my @devs = devspec2array($devspec);
+
+    # Alle SnipsNames und SnipsRooms sammeln
+    foreach (@devs) {
+        push @devices, AttrVal($_,"snipsName",undef);
+        push @rooms, AttrVal($_,"snipsRoom",undef);
+    }
+
+    # Doubletten rausfiltern
+    %devicesHash = map { if (defined($_)) { $_, 1 } else { () } } @devices;
+    %roomsHash = map { if (defined($_)) { $_, 1 } else { () } } @rooms;
+    @devices = keys %devicesHash;
+    @rooms = keys %roomsHash;
+
+    # JSON Struktur erstellen
+    if (@devices > 0 || @rooms > 0) {
+      my $json;
+      my $injectData, my $deviceData, my $roomData;
+      my @operations, my @deviceOperation, my @roomOperation;
+
+      $deviceData->{'de.fhem.Device'} = \@devices;
+      @deviceOperation = ('add', $deviceData);
+
+      $roomData->{'de.fhem.Room'} = \@rooms;
+      @roomOperation = ('add', $roomData);
+
+      push(@operations, \@deviceOperation) if @devices > 0;
+      push(@operations, \@roomOperation) if @rooms > 0;
+
+      $injectData->{'operations'} = \@operations;
+      $json = eval { toJSON($hashRef) };
+
+      Log3($hash->{NAME}, 5, "Injecting data to ASR: $json");
+
+      # ASR Inject über MQTT senden
+      MQTT::send_publish($hash->{IODev}, topic => 'hermes/asr/inject', message => $json, qos => 0, retain => "0");
     }
 }
 
