@@ -382,6 +382,7 @@ sub say($$) {
 
 # Update vom Sips Model / ASR Injection
 sub updateModel($) {
+    my ($hash) = @_;
     my @devices, my @rooms;
     my %devicesHash, my %roomsHash;
     my $devspec = "room=Snips";
@@ -415,7 +416,7 @@ sub updateModel($) {
       push(@operations, \@roomOperation) if @rooms > 0;
 
       $injectData->{'operations'} = \@operations;
-      $json = eval { toJSON($hashRef) };
+      $json = eval { toJSON($injectData) };
 
       Log3($hash->{NAME}, 5, "Injecting data to ASR: $json");
 
