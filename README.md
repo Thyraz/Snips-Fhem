@@ -165,7 +165,7 @@ Details dazu in den folgenden Beschreibungen der einzelnen Intents.
   \
   Optionen:
     * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann
-    * __*part*__ Splittet das *currentVal* Reading bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
+    * __*part*__ Splittet *currentVal* Reading bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
     * __*cmd*__ Set-Befehl des Geräts der ausgeführt werden soll. z.B. dim
     * __*minVal*__ Minimal möglicher Stellwert
     * __*maxVal*__ Maximal möglicher Stellwert
@@ -191,7 +191,7 @@ Beispiel: `GetNumeric:currentVal=temperature,part=1`\
 \
 Optionen:
   * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann
-  * __*part*__ Splittet das *currentVal* Reading bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
+  * __*part*__ Splittet *currentVal* Reading bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
   * __*map*__ Siehe Beschreibung im *SetNumeric* Intent. Hier wird rückwärts gerechnet um wieder Prozent zu erhalten
   * __*minVal*__ nur nötig bei genutzter `map` Option
   * __*maxVal*__ nur nötig bei genutzter `map` Option
