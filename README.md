@@ -266,6 +266,10 @@ Solltet ihr keine Antwort von Snips bekommen, einfach Verbose im Snips Device au
 Ihr solltet dann im Log sehen welcher Intent erkannt wurde und welche Slots mit welchen Werten belegt sind.\
 Gibt es Fehler beim Aufruf der Perl Funktion sollte man dies hier auch sehen.
 
+Wenn Snips eure Geräte- oder Raumnamen nicht versteht,\
+wurde evtl. das ASR Inject Paket nicht installiert:\
+[Installation ASR Injection](#wichtig-asr-injection-installieren)
+
 ## Snips Installation
 
 ### Raspberry Pi
