@@ -291,6 +291,13 @@ Wegen Systemd Installation danach evtl. neu booten.
 Dann Anleitung hier befolgen:\
 https://snips.gitbook.io/documentation/advanced-configuration/advanced-solutions
 
+### Wichtig: ASR Injection installieren
+Damit das FHEM Modul der Snips App eure Geräte- und Raumnamen zur Verfügung stellen kann,\
+muss zusätzlich noch snips-asr-snip-asr-injection installiert werden:
+```
+   sudo apt-get install -y snips-asr-injection
+```
+Andernfalls wird Snips eure Geräte- und Raumbezeichnungen nicht verstehen.
 
 ### Sound Setup
 über `aplay -l` und `arecord -l` kann man sich erkannte Soundkarten und Mikrofone anzeigen lassen.\
