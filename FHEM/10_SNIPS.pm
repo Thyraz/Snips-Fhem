@@ -205,9 +205,8 @@ sub getDeviceByName($$$) {
 
     foreach (@devices) {
         # 2 Arrays bilden mit Namen und Räumen des Devices
-        my @names = ($_, AttrVal($_,"alias",undef), AttrVal($_,"snipsName",undef));
-        my @rooms = split(',', AttrVal($_,"room",undef));
-        push (@rooms, AttrVal($_,"snipsRoom",undef));
+        my @names = split(',', AttrVal($_,"snipsName",undef));
+        my @rooms = split(',', AttrVal($_,"snipsRoom",undef));
 
         # Case Insensitive schauen ob der gesuchte Name (oder besser Name und Raum) in den Arrays vorhanden ist
         if (grep( /^$name$/i, @names)) {
@@ -231,8 +230,7 @@ sub getDeviceByType($$$$) {
 
     foreach (@devices) {
         # Array bilden mit Räumen des Devices
-        my @rooms = split(',', AttrVal($_,"room",undef));
-        push (@rooms, AttrVal($_,"snipsRoom",undef));
+        my @rooms = split(',', AttrVal($_,"snipsRoom",undef));
         my $mapping = SNIPS::getMapping($hash, $_, $intent, $type);
         my $mappingType = $mapping->{'type'};
 
@@ -390,8 +388,8 @@ sub updateModel($) {
 
     # Alle SnipsNames und SnipsRooms sammeln
     foreach (@devs) {
-        push @devices, AttrVal($_,"snipsName",undef);
-        push @rooms, AttrVal($_,"snipsRoom",undef);
+        push @devices, split(',', AttrVal($_,"snipsName",undef));AttrVal($_,"snipsName",undef);
+        push @rooms, split(',', AttrVal($_,"snipsRoom",undef));
     }
 
     # Doubletten rausfiltern
