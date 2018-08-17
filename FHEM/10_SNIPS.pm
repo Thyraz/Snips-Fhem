@@ -10,6 +10,7 @@
 use strict;
 use warnings;
 
+
 my %gets = (
     "version" => "",
     "status" => ""
@@ -24,7 +25,9 @@ my %sets = (
 # MQTT Topics die das Modul automatisch abonniert
 my @topics = qw(
     hermes/intent/+
+    hermes/nlu/intentParsed/+
 );
+
 
 sub SNIPS_Initialize($) {
     my $hash = shift @_;
@@ -44,6 +47,7 @@ sub SNIPS_Initialize($) {
 
     main::LoadModule("MQTT");
 }
+
 
 package SNIPS;
 
@@ -161,6 +165,7 @@ sub subscribeTopics($) {
     }
 }
 
+
 # Topics abbestellen
 sub unsubscribeTopics($) {
     my ($hash) = @_;
@@ -174,22 +179,66 @@ sub unsubscribeTopics($) {
 }
 
 
+# Alle Gerätenamen sammeln
+sub allSnipsNames() {
+    my @devices, @sorted;
+    my %devicesHash;
+    my @devs = devspec2array($devspec);
+
+    # Alle SnipsNames sammeln
+    foreach (@devs) {
+        push @devices, split(',', AttrVal($_,"snipsName",undef));
+    }
+
+    # Doubletten rausfiltern
+    %devicesHash = map { if (defined($_)) { $_, 1 } else { () } } @devices;
+    @devices = keys %devicesHash;
+
+    # Längere Werte zuerst, damit bei Ersetzungen z.B. nicht 'lampe' gefunden wird bevor der eigentliche Treffer 'deckenlampe' versucht wurde
+    my @sorted = sort { length($b) <=> length($a) } @devices;
+
+    return @sorted
+}
+
+
+# Alle Raumbezeichnungen sammeln
+sub allSnipsRooms() {
+    my @rooms, @sorted;
+    my %roomsHash;
+    my @devs = devspec2array($devspec);
+
+    # Alle SnipsNames sammeln
+    foreach (@devs) {
+        push @rooms, split(',', AttrVal($_,"snipsRoom",undef));
+    }
+
+    # Doubletten rausfiltern
+    %roomsHash = map { if (defined($_)) { $_, 1 } else { () } } @rooms;
+    @rooms = keys %roomsHash;
+
+    # Längere Werte zuerst, damit bei Ersetzungen z.B. nicht 'küche' gefunden wird bevor der eigentliche Treffer 'waschküche' versucht wurde
+    my @sorted = sort { length($b) <=> length($a) } @rooms;
+
+    return @sorted
+}
+
+
 # Raum aus gesprochenem Text oder aus siteId verwenden? (siteId "default" durch Attr defaultRoom ersetzen)
 sub roomName ($$) {
-  my ($hash, $data) = @_;
+    my ($hash, $data) = @_;
 
-  my $room;
-  my $defaultRoom = $hash->{helper}{defaultRoom};
+    my $room;
+    my $defaultRoom = $hash->{helper}{defaultRoom};
 
-  # Slot "Room" im JSON vorhanden? Sonst Raum des angesprochenen Satelites verwenden
-  if (exists($data->{'Room'})) {
-      $room = $data->{'Room'};
-  } else {
-      $room = $data->{'siteId'};
-      $room = $defaultRoom if ($room eq 'default' || !(length $room));
-  }
+    # Slot "Room" im JSON vorhanden? Sonst Raum des angesprochenen Satelites verwenden
+    if (exists($data->{'Room'})) {
+        $room = $data->{'Room'};
+    } else {
+        $room = $data->{'siteId'};
+        $room = $defaultRoom if ($room eq 'default' || !(length $room));
+    }
 
-  return $room;
+    return $room;
 }
 
 
@@ -217,6 +266,7 @@ sub getDeviceByName($$$) {
     }
     return $device;
 }
+
 
 # Gerät über Raum, Intent und Type suchen
 sub getDeviceByType($$$$) {
@@ -274,8 +324,8 @@ sub getMapping($$$$) {
 
 
 # JSON parsen
-sub parseJSON($$$) {
-    my ($hash, $intent, $json) = @_;
+sub parseJSON($$) {
+    my ($hash, $json) = @_;
     my $data;
 
     # JSON Decode und Fehlerüberprüfung
@@ -285,12 +335,14 @@ sub parseJSON($$$) {
     }
 
     # Standard-Keys auslesen
+    $data->{'intent'} = $decoded->{'intent'}{'intentName'};
     $data->{'probability'} = $decoded->{'intent'}{'probability'};
     $data->{'sessionId'} = $decoded->{'sessionId'};
     $data->{'siteId'} = $decoded->{'siteId'};
+    $data->{'input'} = $decoded->{'input'};
 
     # Überprüfen ob Slot Array existiert
-    if (ref($decoded->{'slots'}) eq 'ARRAY') {
+    if (exists($decoded->{'slots'}) {
         my @slots = @{$decoded->{'slots'}};
 
         # Key -> Value Paare aus dem Slot Array ziehen
@@ -303,6 +355,15 @@ sub parseJSON($$$) {
             $data->{$slotName} = $slotValue;
         }
     }
+
+    # Falls Info Dict angehängt ist, handelt es sich um einen mit Standardwerten über NLU umgeleiteten Request. -> Originalwerte wiederherstellen
+    if (exists($decoded->{'id'})) {
+        $data->{'sessionId'} = $decoded->{'id'}{'sessionId'} if exists($decoded->{'id'}{'sessionId'});
+        $data->{'siteId'} = $decoded->{'id'}{'siteId'} if exists($decoded->{'id'}{'siteId'});
+        $data->{'device'} = $decoded->{'id'}{'device'} if exists($decoded->{'id'}{'device'});
+        $data->{'room'} = $decoded->{'id'}{'room'} if exists($decoded->{'id'}{'room'});
+    }
+
     return $data;
 }
 
@@ -314,35 +375,84 @@ sub encodeJSON($) {
 
     # JSON Encode und Fehlerüberprüfung
     $json = eval { toJSON($hashRef) };
-#    if ($@) {
-#          Log3($hash->{NAME}, 5, "JSON Encoding Error");
-#          return undef;
-#    }
+   if ($@) {
+         Log3($hash->{NAME}, 5, "JSON Encoding Error");
+         return undef;
+   }
 
     return $json;
 }
 
 
-# Daten vom MQTT Modul empfangen
+# Daten vom MQTT Modul empfangen -> Device und Room ersetzen, dann erneut an NLU übergeben
 sub onmessage($$$) {
     my ($hash, $topic, $message) = @_;
 
-    Log3($hash->{NAME}, 5, "received message '" . $message . "' for topic: " . $topic);
-
-    # Readings updaten
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, "lastIntentTopic", $topic);
-    readingsBulkUpdate($hash, "lastIntentPayload", $message);
-    readingsEndUpdate($hash, 1);
-
-    # hermes/intent published
+    # Sprachintent von Snips empfangen
     if ($topic =~ qr/^hermes\/intent\/.*:/) {
-        # MQTT Pfad und Prefix vom Topic entfernen
-        (my $intent = $topic) =~ s/^hermes\/intent\/.*.://;
-        Log3($hash->{NAME}, 5, "Intent: $intent");
+        my $data, my $info;
+        my $device, $room;
+        my @devices, my @rooms;
+        my $command;
+
+        Log3($hash->{NAME}, 5, "received message from sessionmanager: " . $message);
+
+        $data = SNIPS::parseJSON($hash, $message);
+        $command = lc($data->{'input'});
+
+        # Geräte- und Raumbezeichnungen im Kommando gegen die Defaultbezeichnung aus dem Snips-Slot tauschen, damit NLU uns versteht
+        foreach ($devices) {
+            if ($command =~ qr/$_/i) {
+                $device = lc($_);
+                $command =~ s/$_/'standardgerät'/;
+                last;
+            }
+        }
+        foreach ($rooms) {
+            if ($command =~ qr/$_/i) {
+                $room = lc($_);
+                $command =~ s/$_/'standardraum'/;
+                last;
+            }
+        }
+
+        # Info Hash wird mit an NLU übergeben um die Rückmeldung später dem Request zuordnen zu können
+        $info = {
+            sessionId   => $data{'sessionId'},
+            siteId      => $data->{'siteId'},
+            device      => $device,
+            room        => $room
+        }
+
+        # Message an NLU Senden
+        $sendData =  {
+            sessionId => "fhem.dummyRequest",
+            input => $command,
+            id => $info
+        };
+
+        $json = SNIPS::encodeJSON($sendData);
+        MQTT::send_publish($hash->{IODev}, topic => 'hermes/nlu/query', message => $json, qos => 0, retain => "0");
+
+        Log3($hash->{NAME}, 5, "sending message from to NLU: " . $message);
+    }
+
+    # Intent von NLU empfangen
+    elsif ($topic eq "hermes/nlu/intentParsed" && $message =~ m/fhem.dummyRequest/) {
+        my $intent;
+        my $data;
+
+        Log3($hash->{NAME}, 5, "received message from NLU: " . $message);
 
         # JSON parsen
-        my $data = SNIPS::parseJSON($hash, $intent, $message);
+        $data = SNIPS::parseJSON($hash, $message);
+        $intent = $data->{'intent'};
+
+        # Readings updaten
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "lastIntentTopic", $topic);
+        readingsBulkUpdate($hash, "lastIntentPayload", toJSON($data));
+        readingsEndUpdate($hash, 1);
 
         # Passenden Intent-Handler aufrufen
         if ($intent eq 'SetOnOff') {
@@ -357,6 +467,20 @@ sub onmessage($$$) {
             SNIPS::handleCustomIntent($hash, $intent, $data);
         }
     }
+}
+
+
+# Antwort ausgeben
+sub respond ($$) {
+    my ($sessionId, $response) = @_;
+
+    my $sendData =  {
+        sessionId => $sessionId,
+        text => $response
+    };
+
+    $json = SNIPS::encodeJSON($sendData);
+    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
 }
 
 
@@ -381,22 +505,8 @@ sub say($$) {
 # Update vom Sips Model / ASR Injection
 sub updateModel($) {
     my ($hash) = @_;
-    my @devices, my @rooms;
-    my %devicesHash, my %roomsHash;
-    my $devspec = "room=Snips";
-    my @devs = devspec2array($devspec);
-
-    # Alle SnipsNames und SnipsRooms sammeln
-    foreach (@devs) {
-        push @devices, split(',', AttrVal($_,"snipsName",undef));AttrVal($_,"snipsName",undef);
-        push @rooms, split(',', AttrVal($_,"snipsRoom",undef));
-    }
-
-    # Doubletten rausfiltern
-    %devicesHash = map { if (defined($_)) { $_, 1 } else { () } } @devices;
-    %roomsHash = map { if (defined($_)) { $_, 1 } else { () } } @rooms;
-    @devices = keys %devicesHash;
-    @rooms = keys %roomsHash;
+    my @devices = allSnipsNames();
+    my @rooms = allSnipsRooms();
 
     # JSON Struktur erstellen
     if (@devices > 0 || @rooms > 0) {
@@ -466,15 +576,10 @@ sub handleCustomIntent($$$) {
             }
         }
     }
-    # Antwort erstellen und Senden
     $response = "Da ist etwas schief gegangen." if (!defined($response));
-    $sendData =  {
-        sessionId => $data->{sessionId},
-        text => $response
-    };
 
-    $json = SNIPS::encodeJSON($sendData);
-    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+    # Antwort senden
+    respond ($data->{sessionId}, $response);
 }
 
 
@@ -508,14 +613,8 @@ sub handleIntentSetOnOff($$) {
             Log3($hash->{NAME}, 1, $error) if (defined($error));
         }
     }
-    # Antwort erstellen und Senden
-    $sendData =  {
-        sessionId => $data->{sessionId},
-        text => $response
-    };
-
-    $json = SNIPS::encodeJSON($sendData);
-    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+    # Antwort senden
+    respond ($data->{sessionId}, $response);
 }
 
 
@@ -563,14 +662,8 @@ sub handleIntentGetOnOff($$) {
             elsif ($status =~ m/^(läuft|fertig)$/ && $value == 0) { $response = $data->{'Device'} . " ist fertig"; }
         }
     }
-    # Antwort erstellen und Senden
-    $sendData =  {
-        sessionId => $data->{sessionId},
-        text => $response
-    };
-
-    $json = SNIPS::encodeJSON($sendData);
-    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+    # Antwort senden
+    respond ($data->{sessionId}, $response);
 }
 
 
@@ -666,14 +759,8 @@ sub handleIntentSetNumeric($$) {
             Log3($hash->{NAME}, 1, $error) if (defined($error));
         }
     }
-    # Antwort erstellen und senden
-    $sendData =  {
-        sessionId => $data->{sessionId},
-        text => $response
-    };
-
-    $json = SNIPS::encodeJSON($sendData);
-    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+    # Antwort senden
+    respond ($data->{sessionId}, $response);
 }
 
 
@@ -734,14 +821,8 @@ sub handleIntentGetNumeric($$) {
             elsif ($type eq "Batterie") { $response = "Der Batteriestand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . (main::looks_like_number($value) ?  " beträgt $value Prozent" : " ist $value"); }
         }
     }
-    # Antwort erstellen und senden
-    $sendData =  {
-        sessionId => $data->{sessionId},
-        text => $response
-    };
-
-    $json = SNIPS::encodeJSON($sendData);
-    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+    # Antwort senden
+    respond ($data->{sessionId}, $response);
 }
 
 1;
