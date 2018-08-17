@@ -57,11 +57,7 @@ Dort eine neue App aus dem Store hinzufügen.\
 Oben den Haken **only show apps with actions** entfernen und nach *FHEM* suchen.\
 Dann die App hinzufügen.
 
-Wenn ihr fertig seid, drückt ihr auf auf Deploy Assistant um das ZIP File herunterzuladen.\
-In diesem Schritt findet auch erst die finale Optimierung der Natural Language und Voice Erkennung statt.\
-Falls ihr euren Assistenten statt auf einer echten Installation erstmal im Browser unter https://console.snips.ai testen wollt,\
-solltet ihr also dennoch nach jeder Änderung einmal den Download des Assistenten anstoßen.\
-Ansonsten kann es sein, dass die Spracherkennung über das Micro des Rechners, oder die Texterkennung des eingegebenen Textes nicht richtig funktioniert.
+Wenn ihr fertig seid, drückt ihr auf auf Deploy Assistant um das ZIP File herunterzuladen.
 
 ## Modul Installation
 10_SNIPS.pm nach `opt/fhem/FHEM`kopieren.
@@ -71,6 +67,8 @@ Die Syntax zur Definition des Moduls sieht so aus:
 ```
 define <name> SNIPS <MqttDevice> <DefaultRoom>
 ```
+
+* *MqttDevice* Name des MQTT Devices in FHEM das zum MQTT Server von Snips verbindet.
 
 * *DefaultRoom* weist die Snips Hauptinstanz einem Raum zu.\
 Im Gegensatz zu weiteren Snips Satellites in anderen Räumen,\
@@ -83,13 +81,13 @@ auch wenn man mehrere Geräte mit dem Alias Deckenlampe in unterschiedlichen Rä
 Beispiel für die Definition des MQTT Servers und Snips in FHEM:
 ```
 define SnipsMQTT MQTT <ip-or-hostname-of-snips-machine>:1883
-define Snips SNIPS SnipsMQTT Homer Wohnzimmer
+define Snips SNIPS SnipsMQTT Wohnzimmer
 ```
 
 
 ## Geräte in FHEM für Snips sichtbar machen
 __Wichtig:__ Nach all den nachfolgenden Änderungen muss immer ein ```set <snipsDevice> modelUpdate``` ausgeführt werden.\
-Dadurch wird das Vokabular von Snips z.B. um eure Geräte- und Raumnamen erweitert.\
+Dadurch wird das Vokabular von Snips um eure Geräte- und Raumnamen erweitert.\
 Dies muss ebenfall ausgeführt werden nachdem eine neue Version eureres Assistenten (manuell oder über *sam install assistant*) installiert wurde,\
 da hier die nachträglich durch FHEM angelernten Worte wieder verloren gehen.
 
@@ -100,17 +98,16 @@ Snips sucht nur nach Geräten, die in FHEM im Raum **Snips** liegen.\
 Also bei allen Geräten die ihr ansprechen wollt diesen Raum hinzufügen.
 
 ### Attribut *snipsName*
-Jedem Gerät in FHEM kann das Attribut **snipsName** hinzugefügt werden.\
-Snips kann Geräte anhand dieser Kriterien finden:
-* Attribut snipsName
-* Attribut alias
-* Name des Geräts in FHEM
+Jedem Gerät in FHEM muss das Attribut **snipsName** hinzugefügt werden.\
+Es können auch mehrere Namen kommagetrennt angegeben werden.\
+Snips findet das Gerät dann unter all diesen Bezeichnungen.\
+Beispiel: `attr <device> snipsName Deckenlampe,Wohnzimmerlampe,Kronleuchter`\
+Es können auch mehrere Geräte denselben snipsName haben, solange man sie über den Raum unterscheiden kann. 
+
 
 ### Attribut *snipsRoom*
-Jedem Gerät in FHEM kann das Attribut **snipsRoom** hinzugefügt werden.\
-Snips kann Geräte anhand dieser Kriterien einem Raum zuordnen:
-* Attribut snipsRoom
-* Alle gewählten Räume im Attribut room
+Jedem Gerät in FHEM muss das Attribut **snipsRoom** hinzugefügt werden.\
+Beispiel: `attr <device> snipsRoom Wohnzimmer`
 
 ### Intents über *snipsMapping* zuordnen
 Das Snips Modul hat bisher noch keine automatische Erkennung von Intents für bestimmte Gerätetypen.\
@@ -174,8 +171,8 @@ Details dazu in den folgenden Beschreibungen der einzelnen Intents.
   
   *Erläuterung zu map=percent:\
   Ist die Option gesetzt, werden alle numerischen Stellwerte als Prozentangaben zwischen minVal und maxVal verstanden.\
-  Bei einer Lampe mit `minVal=0` und `maxVal=255` hat also **Stelle die Lampe auf 50**\
-  das selbe Verhalten wie **Stelle die Lampe auf 50 Prozent**.\
+  Bei einer Lampe mit `minVal=0` und `maxVal=255` und `map=percent` verhält sich also **Stelle die Lampe auf 50**\
+  genauso wie **Stelle die Lampe auf 50 Prozent**.\
   Dies mag bei einer Lampe mehr Sinn ergeben als Werte von 0...255 anzusagen.\
   Beim Sollwert eines Thermostats hingegen wird man die Option eher nicht nutzen,\
   da dort die Angaben normal in °C erfolgen und nicht prozentual zum möglichen Sollwertbereich.*
