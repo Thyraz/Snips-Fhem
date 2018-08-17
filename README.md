@@ -54,26 +54,10 @@ Es muss vor dem Snips Modul also ein MQTT Device für den Snips MQTT Server in F
 Account unter https://console.snips.ai erstellen und einen neuen Assistenten erstellen.
 
 Dort eine neue App aus dem Store hinzufügen.\
-Oben den Haken **only show apps with actions** entfernen und nach *FHEM* suchen.
+Oben den Haken **only show apps with actions** entfernen und nach *FHEM* suchen.\
+Dann die App hinzufügen.
 
-Die App hinzufügen und danach anwählen. Hier auf *Edit App* klicken, dann auf *Fork*.\
-Nun könnt ihr in die einzelnen Intents hineinschauen und die Beispielsätze sehen.
-
-Zusätzlich könnt ihr die Beispiel-Geräte um eure eigenen erweitern.\
-Dazu z.B. den SetOnOff Intent öffnen und beim Slot **de.fhem.Devices** auf editieren klicken.\
-Nun bekommt ihr eine Liste mit bisher von mir eingetragenen Gerätenamen.\
-Erweitert diese um eure Geräte.\
-Der vorne eingetragene Name muss später in Fhem über das Attribut *snipsName* bekannt gemacht werden.
-
-Es sind auch ein oder mehrere Synonyme möglich.\
-So kann man für die Deckenlampe z.B. noch Deckenlicht und Wohnzimmerlampe eintragen.\
-Snips wird bei all diesen Bezeichnungen dann später dennoch Deckenlampe als Slot Device an FHEM übertragen.
-
-Wenn ihr fertig seid, drückt ihr auf Save und danach auf Deploy Assistant um das ZIP File herunterzuladen.\
-In diesem Schritt findet auch erst die finale Optimierung der Natural Language und Voice Erkennung statt.\
-Falls ihr Snips statt auf einer echten Installation erstmal im Browser unter https://console.snips.ai testen wollt,\
-solltet ihr also dennoch nach jeder Änderung einmal den Download des Assistenten anstoßen.\
-Ansonsten kann es sein, dass die Spracherkennung über das Micro des Rechners, oder die Texterkennung des eingegebenen Textes nicht richtig funktioniert.
+Wenn ihr fertig seid, drückt ihr auf auf Deploy Assistant um das ZIP File herunterzuladen.
 
 ## Modul Installation
 10_SNIPS.pm nach `opt/fhem/FHEM`kopieren.
@@ -83,6 +67,8 @@ Die Syntax zur Definition des Moduls sieht so aus:
 ```
 define <name> SNIPS <MqttDevice> <DefaultRoom>
 ```
+
+* *MqttDevice* Name des MQTT Devices in FHEM das zum MQTT Server von Snips verbindet.
 
 * *DefaultRoom* weist die Snips Hauptinstanz einem Raum zu.\
 Im Gegensatz zu weiteren Snips Satellites in anderen Räumen,\
@@ -95,11 +81,16 @@ auch wenn man mehrere Geräte mit dem Alias Deckenlampe in unterschiedlichen Rä
 Beispiel für die Definition des MQTT Servers und Snips in FHEM:
 ```
 define SnipsMQTT MQTT <ip-or-hostname-of-snips-machine>:1883
-define Snips SNIPS SnipsMQTT Homer Wohnzimmer
+define Snips SNIPS SnipsMQTT Wohnzimmer
 ```
 
 
 ## Geräte in FHEM für Snips sichtbar machen
+__Wichtig:__ Nach all den nachfolgenden Änderungen muss immer ein ```set <snipsDevice> modelUpdate``` ausgeführt werden.\
+Dadurch wird das Vokabular von Snips um eure Geräte- und Raumnamen erweitert.\
+Dies muss ebenfall ausgeführt werden nachdem eine neue Version eureres Assistenten (manuell oder über *sam install assistant*) installiert wurde,\
+da hier die nachträglich durch FHEM angelernten Worte wieder verloren gehen.
+
 Damit Snips Geräte aus FHEM erkennt und auch ansprechen/abfragen kann, sind ein paar Voraussetzungen zu erfüllen:
 
 ### Raum Snips
@@ -107,17 +98,16 @@ Snips sucht nur nach Geräten, die in FHEM im Raum **Snips** liegen.\
 Also bei allen Geräten die ihr ansprechen wollt diesen Raum hinzufügen.
 
 ### Attribut *snipsName*
-Jedem Gerät in FHEM kann das Attribut **snipsName** hinzugefügt werden.\
-Snips kann Geräte anhand dieser Kriterien finden:
-* Attribut snipsName
-* Attribut alias
-* Name des Geräts in FHEM
+Jedem Gerät in FHEM muss das Attribut **snipsName** hinzugefügt werden.\
+Es können auch mehrere Namen kommagetrennt angegeben werden.\
+Snips findet das Gerät dann unter all diesen Bezeichnungen.\
+Beispiel: `attr <device> snipsName Deckenlampe,Wohnzimmerlampe,Kronleuchter`\
+Es können auch mehrere Geräte denselben snipsName haben, solange man sie über den Raum unterscheiden kann. 
+
 
 ### Attribut *snipsRoom*
-Jedem Gerät in FHEM kann das Attribut **snipsRoom** hinzugefügt werden.\
-Snips kann Geräte anhand dieser Kriterien einem Raum zuordnen:
-* Attribut snipsRoom
-* Alle gewählten Räume im Attribut room
+Jedem Gerät in FHEM muss das Attribut **snipsRoom** hinzugefügt werden.\
+Beispiel: `attr <device> snipsRoom Wohnzimmer`
 
 ### Intents über *snipsMapping* zuordnen
 Das Snips Modul hat bisher noch keine automatische Erkennung von Intents für bestimmte Gerätetypen.\
@@ -126,17 +116,18 @@ Einem Gerät können mehrere Intents zugewiesen werden, dazu einfach eine Zeile 
 
 Das Mapping folgt dabei dem Schema:
 ```
-IntentName=currentValueReading,option1=value1,option2=value2,...
+IntentName:option1=value1,option2=value2,...
 ```
-currentValueReading ist dabei ein Reading, welches den aktuellen Wert des Geräts zurückspiegelt.\
-Bei einem SetOnOff Intent wären das die Werte aus den Mapping-Optionen cmdOn bzw. cmdOff.\
-Für einen SetNumeric Intent muss das Reading z.B. den aktuell per dim XX gesetzten Helligkeitswert zurückliefern.\
+Bei einigen Intents gibt es die Option *currentVal*,\
+bei der das Reading angegeben wird aus dem der aktuelle Wert ausgelesen werden kann.\
+Für einen GetNumeric Intent kann das z.B. das Reading sein, welches den aktuell gesetzten Helligkeitswert zurückliefert.\
 Liefert das Device zusätzlich zu der benötigten Info noch eine Einheit wie z.B. `5 °C`,\
-kann die Zahl über die Option *part=0* extrahiert werden.
+kann die Zahl über die Option *part=0* extrahiert werden.\
+Details dazu in den folgenden Beschreibungen der einzelnen Intents.
 
 * **SetOnOff**\
   Intent zum Ein-/Ausschalten, Öffnen/Schließen, Starten/Stoppen, ...\
-  Beispiel: `SetOnOff=brightness,valueOff=0,cmdOn=on,cmdOff=off`\
+  Beispiel: `SetOnOff:valueOff=0,cmdOn=on,cmdOff=off`\
   \
   Optionen:\
   *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.*
@@ -152,12 +143,13 @@ kann die Zahl über die Option *part=0* extrahiert werden.
 
 * **GetOnOff**\
   Intent zur Zustandsabfrage von Schaltern, Kontakten, Geräten, ...
-  Beispiel: `GetOnOff=reportedState,valueOff=closed`\
+  Beispiel: `GetOnOff:currentVal=state,valueOff=closed`\
   \
   Optionen:\
   *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.*
-    * __*valueOff*__ Wert von *currentValueReading* der als **off** gewertet wird
-    * __*valueOn*__ Wert von *currentValueReading* der als **on** gewertet wird
+    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann
+    * __*valueOff*__ Wert von *currentVal* Reading der als **off** gewertet wird
+    * __*valueOn*__ Wert von *currentVal* Reading der als **on** gewertet wird
 
   Beispielsätze:
   > Ist die Deckenlampe im Büro eingeschaltet?\
@@ -166,10 +158,11 @@ kann die Zahl über die Option *part=0* extrahiert werden.
   
 * **SetNumeric**\
   Intent zum Dimmen, Lautstärke einstellen, Temperatur einstellen, ...\
-  Beispiel: `SetNumeric=pct,cmd=dim,minVal=0,maxVal=99,step=25`\
+  Beispiel: `SetNumeric:currentVal=pct,cmd=dim,minVal=0,maxVal=99,step=25`\
   \
   Optionen:
-    * __*part*__ Splittet *currentValueReading* bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
+    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann
+    * __*part*__ Splittet *currentVal* Reading bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
     * __*cmd*__ Set-Befehl des Geräts der ausgeführt werden soll. z.B. dim
     * __*minVal*__ Minimal möglicher Stellwert
     * __*maxVal*__ Maximal möglicher Stellwert
@@ -178,8 +171,8 @@ kann die Zahl über die Option *part=0* extrahiert werden.
   
   *Erläuterung zu map=percent:\
   Ist die Option gesetzt, werden alle numerischen Stellwerte als Prozentangaben zwischen minVal und maxVal verstanden.\
-  Bei einer Lampe mit `minVal=0` und `maxVal=255` hat also **Stelle die Lampe auf 50**\
-  das selbe Verhalten wie **Stelle die Lampe auf 50 Prozent**.\
+  Bei einer Lampe mit `minVal=0` und `maxVal=255` und `map=percent` verhält sich also **Stelle die Lampe auf 50**\
+  genauso wie **Stelle die Lampe auf 50 Prozent**.\
   Dies mag bei einer Lampe mehr Sinn ergeben als Werte von 0...255 anzusagen.\
   Beim Sollwert eines Thermostats hingegen wird man die Option eher nicht nutzen,\
   da dort die Angaben normal in °C erfolgen und nicht prozentual zum möglichen Sollwertbereich.*
@@ -191,10 +184,11 @@ kann die Zahl über die Option *part=0* extrahiert werden.
 
 * **GetNumeric**\
 Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstärke, ...
-Beispiel: `GetNumeric=temperature,part=1`\
+Beispiel: `GetNumeric:currentVal=temperature,part=1`\
 \
 Optionen:
-  * __*part*__ Splittet *currentValueReading* bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
+  * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann
+  * __*part*__ Splittet *currentVal* Reading bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
   * __*map*__ Siehe Beschreibung im *SetNumeric* Intent. Hier wird rückwärts gerechnet um wieder Prozent zu erhalten
   * __*minVal*__ nur nötig bei genutzter `map` Option
   * __*maxVal*__ nur nötig bei genutzter `map` Option
@@ -266,6 +260,13 @@ Solltet ihr keine Antwort von Snips bekommen, einfach Verbose im Snips Device au
 Ihr solltet dann im Log sehen welcher Intent erkannt wurde und welche Slots mit welchen Werten belegt sind.\
 Gibt es Fehler beim Aufruf der Perl Funktion sollte man dies hier auch sehen.
 
+Wenn Snips eure Geräte- oder Raumnamen nicht versteht,\
+wurde evtl. das ASR Inject Paket nicht installiert:\
+[Installation ASR Injection](#wichtig-asr-injection-installieren)
+
+Sollte Snips nach Aktualisierung eures Assistenten, dem Hinzufügen neuer Geräte, oder dem Ändern von snipsName oder snipsRoom Attributen Geräte- oder Raumbezeichnungen nicht mehr verstehen,\
+bitte sicherstellen, dass ```set <snipsDevice> modelUpdate``` ausgeführt wurde.
+
 ## Snips Installation
 
 ### Raspberry Pi
@@ -274,7 +275,7 @@ Anleitung hier befolgen:
 https://snips.gitbook.io/documentation/installing-snips/on-a-raspberry-pi
 
 ### AMD64
-Installation muss aktuell neuerdings auf __Debian Stretch__ erfolgen.
+Installation muss aktuell auf __Debian Stretch__ erfolgen.
 
 Für die erfolgreiche Installation musste ich die non-free Packages in Apt hinzufügen:
 ```
@@ -291,6 +292,13 @@ Wegen Systemd Installation danach evtl. neu booten.
 Dann Anleitung hier befolgen:\
 https://snips.gitbook.io/documentation/advanced-configuration/advanced-solutions
 
+### Wichtig: ASR Injection installieren
+Damit das FHEM Modul der Snips App eure Geräte- und Raumnamen zur Verfügung stellen kann,\
+muss zusätzlich noch snips-asr-snip-asr-injection installiert werden:
+```
+   sudo apt-get install -y snips-asr-injection
+```
+Andernfalls wird Snips eure Geräte- und Raumbezeichnungen nicht verstehen.
 
 ### Sound Setup
 über `aplay -l` und `arecord -l` kann man sich erkannte Soundkarten und Mikrofone anzeigen lassen.\
