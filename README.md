@@ -9,6 +9,7 @@ https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-p
 [Über Snips-Fhem](#Über-snips-fhem)\
 [Assistent erstellen](#assistent-erstellen)\
 [Modul Installation](#modul-installation)\
+[Befehle](#befehle)\
 [Geräte in FHEM für Snips sichtbar machen](#geräte-in-fhem-für-snips-sichtbar-machen)\
 [Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren](#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren)\
 [Anhang 1: Snips Installation](#snips-installation)\
@@ -105,7 +106,7 @@ define Snips SNIPS SnipsMQTT Wohnzimmer
   Snips verwirft die angelernten Wörter wenn ihr einen neuen Assistenten installiert.\
   Kopiert ihr also einen neuen Assistenten (oder eine neue Version des aktuellen Assistenten) auf den Rechner,\
   müsst ihr updateModell erneut ausführen.\
-  Auch nach dem Hinzufügen neuer Geräte, oder ändern/hinzufügen von snipsName muss updateModell erneut ausgeführt werden.
+  Auch nach dem Hinzufügen neuer Geräte, oder ändern/hinzufügen von snipsNames muss updateModell erneut ausgeführt werden.
 
 
 ## Geräte in FHEM für Snips sichtbar machen
