@@ -84,6 +84,29 @@ define SnipsMQTT MQTT <ip-or-hostname-of-snips-machine>:1883
 define Snips SNIPS SnipsMQTT Wohnzimmer
 ```
 
+## Befehle
+### Set Befehle
+
+* **say**\
+  Sprachausgabe über TTS.\
+  Snips gibt den übergeben Text per Sprache aus\
+  Beispiel: `set <snipsDevice> say Dies ist ein Test`
+  
+* **textCommand**\
+  Snips per Text steuern.\
+  Kann zum Beispiel mit diversen Messengerlösungen wie TelegramBot verwendet werden.\
+  Das Kommando wird normal abgearbeitet als wäre es vom Nutzer gesprochen worden.\
+  Die Rückantwort wird aber nicht per TTS ausgegeben, sondern im Reading *textResponse* abgelegt.\
+  Beispiel `set <snipsDevice> textCommand Wie warm ist es im Wohnzimmer`
+  
+* **updateModel**\
+  Erweitert den Wortschatz eures Assistenen um die Begriffe aus eurer FHEM Konfiguration.\
+  z.B. Geräte- oder Raumbezeichnungen.\
+  Snips verwirft die angelernten Wörter wenn ihr einen neuen Assistenten installiert.\
+  Kopiert ihr also einen neuen Assistenten (oder eine neue Version des aktuellen Assistenten) auf den Rechner,\
+  müsst ihr updateModell erneut ausführen.\
+  Auch nach dem Hinzufügen neuer Geräte, oder ändern/hinzufügen von snipsName muss updateModell erneut ausgeführt werden.
+
 
 ## Geräte in FHEM für Snips sichtbar machen
 __Wichtig:__ Nach all den nachfolgenden Änderungen muss immer ein ```set <snipsDevice> modelUpdate``` ausgeführt werden.\
@@ -103,7 +126,6 @@ Es können auch mehrere Namen kommagetrennt angegeben werden.\
 Snips findet das Gerät dann unter all diesen Bezeichnungen.\
 Beispiel: `attr <device> snipsName Deckenlampe,Wohnzimmerlampe,Kronleuchter`\
 Es können auch mehrere Geräte denselben snipsName haben, solange man sie über den Raum unterscheiden kann. 
-
 
 ### Attribut *snipsRoom*
 Jedem Gerät in FHEM muss das Attribut **snipsRoom** hinzugefügt werden.\
