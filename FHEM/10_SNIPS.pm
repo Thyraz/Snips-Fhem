@@ -19,7 +19,8 @@ my %gets = (
 my %sets = (
     "say" => "",
     "play" => "",
-    "updateModel" => ""
+    "updateModel" => "",
+    "textCommand" => ""
 );
 
 # MQTT Topics die das Modul automatisch abonniert
@@ -129,7 +130,12 @@ sub Set($$$@) {
     # Say Cmd
     if ($command eq "say") {
         my $text = join (" ", @values);
-        SNIPS::say($hash,$text);
+        SNIPS::say($hash, $text);
+    }
+    # TextCommand Cmd
+    elsif ($command eq "textCommand") {
+        my $text = join (" ", @values);
+        SNIPS::textCommand($hash, $text);
     }
     # Update Model Cmd
     elsif ($command eq "updateModel") {
@@ -196,7 +202,7 @@ sub allSnipsNames() {
     @devices = keys %devicesHash;
 
     # Längere Werte zuerst, damit bei Ersetzungen z.B. nicht 'lampe' gefunden wird bevor der eigentliche Treffer 'deckenlampe' versucht wurde
-    my @sorted = sort { length($b) <=> length($a) } @devices;
+    @sorted = sort { length($b) <=> length($a) } @devices;
 
     return @sorted
 }
@@ -219,7 +225,7 @@ sub allSnipsRooms() {
     @rooms = keys %roomsHash;
 
     # Längere Werte zuerst, damit bei Ersetzungen z.B. nicht 'küche' gefunden wird bevor der eigentliche Treffer 'waschküche' versucht wurde
-    my @sorted = sort { length($b) <=> length($a) } @rooms;
+    @sorted = sort { length($b) <=> length($a) } @rooms;
 
     return @sorted
 }
@@ -387,6 +393,7 @@ sub onmessage($$$) {
         my @devices = allSnipsNames();
         my @rooms = allSnipsRooms();
         my $json, my $infoJson;
+        my $sessionId;
 
         my $data = SNIPS::parseJSON($hash, $message);
         my $command = $data->{'input'};
@@ -418,8 +425,9 @@ sub onmessage($$$) {
         $infoJson = toJSON($info);
 
         # Message an NLU Senden
+        $sessionId = ($topic eq "hermes/intent/FHEM:TextCommand") ? "fhem.textCommand" :"fhem.voiceCommand";
         $sendData =  {
-            sessionId => "fhem.dummyRequest",
+            sessionId => $sessionId,
             input => $command,
             id => $infoJson
         };
@@ -431,12 +439,16 @@ sub onmessage($$$) {
     }
 
     # Intent von NLU empfangen
-    elsif ($topic eq "hermes/nlu/intentParsed" && $message =~ m/fhem.dummyRequest/) {
+    elsif ($topic eq "hermes/nlu/intentParsed" && ($message =~ m/fhem.voiceCommand/ || $message =~ m/fhem.textCommand/)) {
         my $intent;
+        my $type;
         my $data;
 
         # JSON parsen
+        $type = ($message =~ m/fhem.voiceCommand/) ? "voice" : "text";
         $data = SNIPS::parseJSON($hash, $message);
+        $data->{'type'} = $type;
+
         $intent = $data->{'intent'};
 
         # Readings updaten
@@ -462,17 +474,36 @@ sub onmessage($$$) {
 
 
 # Antwort ausgeben
-sub respond ($$$) {
-    my ($hash, $sessionId, $response) = @_;
+sub respond($$$$) {
+    my ($hash, $type, $sessionId, $response) = @_;
     my $json;
 
-    my $sendData =  {
-        sessionId => $sessionId,
-        text => $response
-    };
+    if ($type eq "voice") {
+        my $sendData =  {
+            sessionId => $sessionId,
+            text => $response
+        };
 
-    $json = toJSON($sendData);
-    MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+        $json = toJSON($sendData);
+        MQTT::send_publish($hash->{IODev}, topic => 'hermes/dialogueManager/endSession', message => $json, qos => 0, retain => "0");
+        readingsSingleUpdate($hash, "voiceResponse", $response, 1);
+    }
+    elsif ($type eq "text") {
+        readingsSingleUpdate($hash, "textResponse", $response, 1);
+    }
+}
+
+
+# Text Kommando an SNIPS
+sub textCommand($$) {
+    my ($hash, $text) = @_;
+
+    my $data = { input => $text };
+    my $message = toJSON($data);
+
+    # Send fake command, so it's forwarded to NLU
+    my $topic = "hermes/intent/FHEM:TextCommand";
+    onmessage($hash, $topic, $message);
 }
 
 
@@ -549,8 +580,8 @@ sub handleCustomIntent($$$) {
     # Custom Intent Definition Parsen
     if ($intent =~ qr/^$intentName=.*\(.*\)/) {
         my @tokens = split(/=|\(|\)/, $intent);
-        my $subName =  "main::" . @tokens[1] if (@tokens > 0);
-        my @paramNames = split(/,/, @tokens[2]) if (@tokens > 1);
+        my $subName =  "main::" . $tokens[1] if (@tokens > 0);
+        my @paramNames = split(/,/, $tokens[2]) if (@tokens > 1);
 
         if (defined($subName)) {
             my @params = map { $data->{$_} } @paramNames;
@@ -571,7 +602,7 @@ sub handleCustomIntent($$$) {
     $response = "Da ist etwas schief gegangen." if (!defined($response));
 
     # Antwort senden
-    respond ($hash, $data->{sessionId}, $response);
+    respond ($hash, $data->{'type'}, $data->{sessionId}, $response);
 }
 
 
@@ -606,7 +637,7 @@ sub handleIntentSetOnOff($$) {
         }
     }
     # Antwort senden
-    respond ($hash, $data->{sessionId}, $response);
+    respond ($hash, $data->{'type'}, $data->{sessionId}, $response);
 }
 
 
@@ -617,7 +648,6 @@ sub handleIntentGetOnOff($$) {
     my $mapping;
     my $sendData, my $json;
     my $response = "Da ist etwas schief gegangen.";
-    my $value;
 
     Log3($hash->{NAME}, 5, "handleIntentGetOnOff called");
 
@@ -655,7 +685,7 @@ sub handleIntentGetOnOff($$) {
         }
     }
     # Antwort senden
-    respond ($hash, $data->{sessionId}, $response);
+    respond ($hash, $data->{'type'}, $data->{sessionId}, $response);
 }
 
 
@@ -708,7 +738,7 @@ sub handleIntentSetNumeric($$) {
             my $oldVal  = ReadingsVal($device, $reading, 0);
             if (defined($part)) {
               my @tokens = split(/ /, $oldVal);
-              $oldVal = @tokens[$part] if (@tokens >= $part);
+              $oldVal = $tokens[$part] if (@tokens >= $part);
             }
 
             # Neuen Wert bestimmen
@@ -752,7 +782,7 @@ sub handleIntentSetNumeric($$) {
         }
     }
     # Antwort senden
-    respond ($hash, $data->{sessionId}, $response);
+    respond ($hash, $data->{'type'}, $data->{sessionId}, $response);
 }
 
 
@@ -793,7 +823,7 @@ sub handleIntentGetNumeric($$) {
             $value = ReadingsVal($device, $reading, undef);
             if (defined($part)) {
               my @tokens = split(/ /, $value);
-              $value = @tokens[$part] if (@tokens >= $part);
+              $value = $tokens[$part] if (@tokens >= $part);
             }
             $value =  main::round((($value * (($maxVal - $minVal) / 100)) + $minVal), 0) if ($forcePercent);
 
@@ -814,7 +844,7 @@ sub handleIntentGetNumeric($$) {
         }
     }
     # Antwort senden
-    respond ($hash, $data->{sessionId}, $response);
+    respond ($hash, $data->{'type'}, $data->{sessionId}, $response);
 }
 
 1;
