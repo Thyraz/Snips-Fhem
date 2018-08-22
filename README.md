@@ -224,6 +224,19 @@ Optionen:
   > Auf was ist das Thermostat im Bad gestellt?\
   > Wie hell ist die Deckenlampe?\
   > Wie laut ist das Radio im Wohnzimmer?
+  
+  * **Status**\
+Intent zur Abfrage von Informationen zu einem Gerät.\ Der Antworttext kann frei gewählt werden, 
+Beispiel: `Status:response=Die Temperatur beträgt [Thermometer:temperature] Grad bei [Thermometer:humidity] Prozent Luftfeuchtigkeit`\
+\
+Optionen:
+  * __*response*__ Text den Snips ausgeben soll. Werte aus FHEM können im Format `[Device:Reading]` eingefügt werden.\
+  Kommas im Text müssen escaped werden (`\,`statt `,`), da normale Kommas beim snipsMapping das Trennzeichen zwischen den verschiedenen Optionen gelten.
+ 
+  Beispielsätze:
+  > Wie ist der Status vom Thermometer im Büro?\
+  > Status Deckenlampe im Wohnzimmer\
+  > Status Waschmaschine
 
 ## Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren
 
