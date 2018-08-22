@@ -59,6 +59,7 @@ use GPUtils qw(:all);
 use JSON;
 use Net::MQTT::Constants;
 use Encode;
+#use Data::Dumper 'Dumper';
 
 BEGIN {
     MQTT->import(qw(:all));
@@ -80,6 +81,7 @@ BEGIN {
         toJSON
         AnalyzeCommand
         AnalyzePerlCommand
+        parseParams
         looks_like_number
     ))
 };
@@ -318,10 +320,10 @@ sub getMapping($$$$;$) {
         next unless $_ =~ qr/^$intent/;
 
         $_ =~ s/$intent://;
-        my %hash = split(/[,=]/, $_);
+        my %options = split(/(?<!\\),|=/, $_);
 
-        if (!defined($mapping) || (defined($type) && $mapping->{'type'} ne $type && $hash{'type'} eq $type)) {
-            $mapping = \%hash;
+        if (!defined($mapping) || (defined($type) && $mapping->{'type'} ne $type && $options{'type'} eq $type)) {
+            $mapping = \%options;
 
             Log3($hash->{NAME}, 5, "snipsMapping selected: $_") if (!defined($disableLog) || (defined($disableLog) && $disableLog != 1));
         }
@@ -849,6 +851,8 @@ sub handleIntentGetNumeric($$) {
     respond ($hash, $data->{'type'}, $data->{sessionId}, $response);
 }
 
+
+# Eingehende "Status" Intents bearbeiten
 sub handleIntentStatus($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room;
@@ -864,14 +868,17 @@ sub handleIntentStatus($$) {
         $device = getDeviceByName($hash, $room, $data->{'Device'});
         $mapping = getMapping($hash, $device, "Status", undef);
 
-        #$response = $mapping->{'response'};
+        # Werte aus Readings nach dem Schema [Device:Reading] im String ersetzen
         $response = ReplaceReadingsVal($hash, $mapping->{'response'});
+        # Escapte Kommas wieder durch normale ersetzen
+        $response =~ s/\\,/,/;
     }
     # Antwort senden
     respond ($hash, $data->{'type'}, $data->{sessionId}, $response);
 }
 
 
+# Abgespeckte Kopie von ReplaceSetMagic aus fhem.pl
 sub	ReplaceReadingsVal($@) {
     my $hash = shift;
     my $a = join(" ", @_);
