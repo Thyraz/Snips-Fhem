@@ -59,6 +59,7 @@ use GPUtils qw(:all);
 use JSON;
 use Net::MQTT::Constants;
 use Encode;
+#use Data::Dumper 'Dumper';
 
 BEGIN {
     MQTT->import(qw(:all));
@@ -80,6 +81,7 @@ BEGIN {
         toJSON
         AnalyzeCommand
         AnalyzePerlCommand
+        parseParams
         looks_like_number
     ))
 };
@@ -318,10 +320,10 @@ sub getMapping($$$$;$) {
         next unless $_ =~ qr/^$intent/;
 
         $_ =~ s/$intent://;
-        my %hash = split(/[,=]/, $_);
+        my %options = split(/(?<!\\),|=/, $_);
 
-        if (!defined($mapping) || (defined($type) && $mapping->{'type'} ne $type && $hash{'type'} eq $type)) {
-            $mapping = \%hash;
+        if (!defined($mapping) || (defined($type) && $mapping->{'type'} ne $type && $options{'type'} eq $type)) {
+            $mapping = \%options;
 
             Log3($hash->{NAME}, 5, "snipsMapping selected: $_") if (!defined($disableLog) || (defined($disableLog) && $disableLog != 1));
         }
@@ -466,6 +468,8 @@ sub onmessage($$$) {
             SNIPS::handleIntentSetNumeric($hash, $data);
         } elsif ($intent eq 'GetNumeric') {
             SNIPS::handleIntentGetNumeric($hash, $data);
+        } elsif ($intent eq 'Status') {
+            SNIPS::handleIntentStatus($hash, $data);
         } else {
             SNIPS::handleCustomIntent($hash, $intent, $data);
         }
@@ -845,6 +849,69 @@ sub handleIntentGetNumeric($$) {
     }
     # Antwort senden
     respond ($hash, $data->{'type'}, $data->{sessionId}, $response);
+}
+
+
+# Eingehende "Status" Intents bearbeiten
+sub handleIntentStatus($$) {
+    my ($hash, $data) = @_;
+    my $value, my $device, my $room;
+    my $mapping;
+    my $sendData, my $json;
+    my $response = "Da ist etwas schief gegangen.";
+
+    Log3($hash->{NAME}, 5, "handleIntentStatus called");
+
+    # Mindestens Device muss existieren
+    if (exists($data->{'Device'})) {
+        $room = roomName($hash, $data);
+        $device = getDeviceByName($hash, $room, $data->{'Device'});
+        $mapping = getMapping($hash, $device, "Status", undef);
+
+        # Werte aus Readings nach dem Schema [Device:Reading] im String ersetzen
+        $response = ReplaceReadingsVal($hash, $mapping->{'response'});
+        # Escapte Kommas wieder durch normale ersetzen
+        $response =~ s/\\,/,/;
+    }
+    # Antwort senden
+    respond ($hash, $data->{'type'}, $data->{sessionId}, $response);
+}
+
+
+# Abgespeckte Kopie von ReplaceSetMagic aus fhem.pl
+sub	ReplaceReadingsVal($@) {
+    my $hash = shift;
+    my $a = join(" ", @_);
+
+    sub readingsVal($$$$$) {
+        my ($all, $t, $d, $n, $s, $val) = @_;
+        my $hash = $defs{$d};
+        return $all if(!$hash);
+
+        if(!$t || $t eq "r:") {
+            my $r = $hash->{READINGS};
+            if($s && ($s eq ":t" || $s eq ":sec")) {
+                return $all if (!$r || !$r->{$n});
+                $val = $r->{$n}{TIME};
+                $val = int(gettimeofday()) - time_str2num($val) if($s eq ":sec");
+                return $val;
+            }
+            $val = $r->{$n}{VAL} if($r && $r->{$n});
+        }
+        $val = $hash->{$n}   if(!defined($val) && (!$t || $t eq "i:"));
+        $val = $main::attr{$d}{$n} if(!defined($val) && (!$t || $t eq "a:") && $main::attr{$d});
+        return $all if(!defined($val));
+
+        if($s && $s =~ /:d|:r|:i/ && $val =~ /(-?\d+(\.\d+)?)/) {
+            $val = $1;
+            $val = int($val) if ( $s eq ":i" );
+            $val = round($val, defined($1) ? $1 : 1) if($s =~ /^:r(\d)?/);
+        }
+        return $val;
+    }
+
+    $a =~s/(\[([ari]:)?([a-zA-Z\d._]+):([a-zA-Z\d._\/-]+)(:(t|sec|i|d|r|r\d))?\])/readingsVal($1,$2,$3,$4,$5)/eg;
+    return $a;
 }
 
 1;
