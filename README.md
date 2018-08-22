@@ -225,7 +225,7 @@ Optionen:
   > Wie hell ist die Deckenlampe?\
   > Wie laut ist das Radio im Wohnzimmer?
   
-  * **Status**\
+* **Status**\
 Intent zur Abfrage von Informationen zu einem Gerät.\ Der Antworttext kann frei gewählt werden, 
 Beispiel: `Status:response=Die Temperatur beträgt [Thermometer:temperature] Grad bei [Thermometer:humidity] Prozent Luftfeuchtigkeit`\
 \
