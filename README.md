@@ -10,6 +10,7 @@ https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-p
 [Assistent erstellen](#assistent-erstellen)\
 [Modul Installation](#modul-installation)\
 [Befehle](#befehle)\
+[Readings](#readings--events)\
 [Geräte in FHEM für Snips sichtbar machen](#geräte-in-fhem-für-snips-sichtbar-machen)\
 [Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren](#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren)\
 [Anhang 1: Snips Installation](#snips-installation)\
@@ -115,7 +116,7 @@ define Snips SNIPS SnipsMQTT Wohnzimmer
 
 * **listening_*roomname***\
   Wechselt auf 1 wenn das Wakeword erkannt wurde\
-  und wieder auf 0 zurück wenn Snips nach der Antwort wieder in den "Standby" geht.
+  und wieder auf 0 zurück wenn Snips nach der Antwort wieder in den "Standby" geht.\
   Ein Reading pro Snips Satellit/Installation.\
   Kann z.B. verwendet werden um über ein Notify die Musik zu muten während Snips lauscht / spricht.
  
