@@ -27,6 +27,8 @@ my %sets = (
 my @topics = qw(
     hermes/intent/+
     hermes/nlu/intentParsed
+    hermes/hotword/+/detected
+    hermes/hotword/toggleOn
 );
 
 
@@ -388,8 +390,27 @@ sub parseJSON($$) {
 sub onmessage($$$) {
     my ($hash, $topic, $message) = @_;
 
-    # Sprachintent von Snips empfangen
-    if ($topic =~ qr/^hermes\/intent\/.*:/) {
+    # Hotword Erkennung
+    if ($topic =~ m/^hermes\/hotword/) {
+        my $data = SNIPS::parseJSON($hash, $message);
+        my $room = roomName($hash, $data);
+
+        if (defined($room)) {
+            my %umlauts = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" );
+            my $keys = join ("|", keys(%umlauts));
+
+            $room =~ s/($keys)/$umlauts{$1}/g;
+
+            if ($topic =~ m/detected/) {
+                readingsSingleUpdate($hash, "listening_" . lc($room), 1, 1);
+            } elsif ($topic =~ m/toggleOn/) {
+                readingsSingleUpdate($hash, "listening_" . lc($room), 0, 1);
+            }
+        }
+    }
+
+    # Sprachintent von Snips empfangen -> Geräte- und Raumnamen ersetzen und Request erneut an NLU senden
+    elsif ($topic =~ qr/^hermes\/intent\/.*:/) {
         my $info, my $sendData;
         my $device, my $room;
         my @devices = allSnipsNames();
@@ -708,6 +729,10 @@ sub handleIntentSetNumeric($$) {
     $validData = 1 if (exists($data->{'Device'}) && exists($data->{'Value'}));
     # Mindestens Device und Change angegeben -> Valid (z.B. Radio lauter)
     $validData = 1 if (exists($data->{'Device'}) && exists($data->{'Change'}));
+    # Nur Change für Lautstärke angegeben -> Valid (z.B. lauter)
+    $validData = 1 if (!exists($data->{'Device'}) && $data->{'Change'} =~ m/^(lauter|leiser)$/i);
+    # Nur Type = Lautstärke und Value angegeben -> Valid (z.B. Lautstärke auf 10)
+    $validData = 1 if (!exists($data->{'Device'}) && $data->{'Type'} =~ m/^Lautstärke$/i && exists($data->{'Value'}));
 
     if ($validData == 1) {
         $unit = $data->{'Unit'};
@@ -715,7 +740,6 @@ sub handleIntentSetNumeric($$) {
         $value = $data->{'Value'};
         $change = $data->{'Change'};
         $room = roomName($hash, $data);
-        $device = getDeviceByName($hash, $room, $data->{'Device'});
 
         # Type nicht belegt -> versuchen Type über change Value zu bestimmen
         if (!defined($type) && defined($change)) {
@@ -724,65 +748,74 @@ sub handleIntentSetNumeric($$) {
             elsif ($change =~ m/^(lauter|leiser)$/)  { $type = "Lautstärke"; }
         }
 
-        $mapping = getMapping($hash, $device, "SetNumeric", $type);
+        # Gerät über Name oder Type suchen
+        if (exists($data->{'Device'})) {
+            $device = getDeviceByName($hash, $room, $data->{'Device'});
+        } elsif (defined($type)) {
+            $device = getDeviceByType($hash, $room, "SetNumeric", $type);
+        }
 
-        # Mapping und Gerät gefunden -> Befehl ausführen
-        if (defined($mapping) && defined($mapping->{'cmd'})) {
-            my $error;
-            my $cmd     = $mapping->{'cmd'};
-            my $reading = $mapping->{'currentVal'};
-            my $part = $mapping->{'part'};
-            my $minVal  = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : 0; # Snips kann keine negativen Nummern bisher, daher erzwungener minVal
-            my $maxVal  = $mapping->{'maxVal'};
-            my $diff    = (defined($value)) ? $value : ((defined($mapping->{'step'})) ? $mapping->{'step'} : 10);
-            my $up      = (defined($change) && ($change =~ m/^(rauf|heller|lauter|wärmer)$/)) ? 1 : 0;
-            my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent") ? 1 : 0;
+        if (defined($device)) {
+            $mapping = getMapping($hash, $device, "SetNumeric", $type);
 
-            # Alten Wert bestimmen
-            my $oldVal  = ReadingsVal($device, $reading, 0);
-            if (defined($part)) {
-              my @tokens = split(/ /, $oldVal);
-              $oldVal = $tokens[$part] if (@tokens >= $part);
-            }
+            # Mapping und Gerät gefunden -> Befehl ausführen
+            if (defined($mapping) && defined($mapping->{'cmd'})) {
+                my $error;
+                my $cmd     = $mapping->{'cmd'};
+                my $reading = $mapping->{'currentVal'};
+                my $part = $mapping->{'part'};
+                my $minVal  = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : 0; # Snips kann keine negativen Nummern bisher, daher erzwungener minVal
+                my $maxVal  = $mapping->{'maxVal'};
+                my $diff    = (defined($value)) ? $value : ((defined($mapping->{'step'})) ? $mapping->{'step'} : 10);
+                my $up      = (defined($change) && ($change =~ m/^(rauf|heller|lauter|wärmer)$/)) ? 1 : 0;
+                my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent") ? 1 : 0;
 
-            # Neuen Wert bestimmen
-            my $newVal;
-            # Direkter Stellwert ("Stelle Lampe auf 50")
-            if ($unit ne "Prozent" && defined($value) && !defined($change) && !$forcePercent) {
-                $newVal = $value;
-                # Begrenzung auf evtl. gesetzte min/max Werte
-                $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
-                $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
-                $response = "Ok";
-            }
-            # Direkter Stellwert als Prozent ("Stelle Lampe auf 50 Prozent", oder "Stelle Lampe auf 50" bei forcePercent)
-            elsif (defined($value) && ($unit eq "Prozent" || $forcePercent) && !defined($change) && defined($minVal) && defined($maxVal)) {
-                # Wert von Prozent in Raw-Wert umrechnen
-                $newVal = $value;
-                $newVal =   0 if ($newVal <   0);
-                $newVal = 100 if ($newVal > 100);
-                $newVal = main::round((($newVal * (($maxVal - $minVal) / 100)) + $minVal), 0);
-                $response = "Ok";
-            }
-            # Stellwert um Wert x ändern ("Mache Lampe um 20 heller" oder "Mache Lampe heller")
-            elsif ($unit ne "Prozent" && defined($change) && !$forcePercent) {
-                $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
-                $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
-                $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
-                $response = "Ok";
-            }
-            # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei forcePercent oder "Mache Lampe heller" bei forcePercent)
-            elsif (($unit eq "Prozent" || $forcePercent) && defined($change)  && defined($minVal) && defined($maxVal)) {
-                my $diffRaw = main::round((($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
-                $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw;
-                $newVal = $minVal if ($newVal < $minVal);
-                $newVal = $maxVal if ($newVal > $maxVal);
-                $response = "Ok";
-            }
+                # Alten Wert bestimmen
+                my $oldVal  = ReadingsVal($device, $reading, 0);
+                if (defined($part)) {
+                  my @tokens = split(/ /, $oldVal);
+                  $oldVal = $tokens[$part] if (@tokens >= $part);
+                }
 
-            # Stellwert senden
-            $error = AnalyzeCommand($hash, "set $device $cmd $newVal") if defined($newVal);
-            Log3($hash->{NAME}, 1, $error) if (defined($error));
+                # Neuen Wert bestimmen
+                my $newVal;
+                # Direkter Stellwert ("Stelle Lampe auf 50")
+                if ($unit ne "Prozent" && defined($value) && !defined($change) && !$forcePercent) {
+                    $newVal = $value;
+                    # Begrenzung auf evtl. gesetzte min/max Werte
+                    $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
+                    $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
+                    $response = "Ok";
+                }
+                # Direkter Stellwert als Prozent ("Stelle Lampe auf 50 Prozent", oder "Stelle Lampe auf 50" bei forcePercent)
+                elsif (defined($value) && ($unit eq "Prozent" || $forcePercent) && !defined($change) && defined($minVal) && defined($maxVal)) {
+                    # Wert von Prozent in Raw-Wert umrechnen
+                    $newVal = $value;
+                    $newVal =   0 if ($newVal <   0);
+                    $newVal = 100 if ($newVal > 100);
+                    $newVal = main::round((($newVal * (($maxVal - $minVal) / 100)) + $minVal), 0);
+                    $response = "Ok";
+                }
+                # Stellwert um Wert x ändern ("Mache Lampe um 20 heller" oder "Mache Lampe heller")
+                elsif ($unit ne "Prozent" && defined($change) && !$forcePercent) {
+                    $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
+                    $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
+                    $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
+                    $response = "Ok";
+                }
+                # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei forcePercent oder "Mache Lampe heller" bei forcePercent)
+                elsif (($unit eq "Prozent" || $forcePercent) && defined($change)  && defined($minVal) && defined($maxVal)) {
+                    my $diffRaw = main::round((($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
+                    $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw;
+                    $newVal = $minVal if ($newVal < $minVal);
+                    $newVal = $maxVal if ($newVal > $maxVal);
+                    $response = "Ok";
+                }
+
+                # Stellwert senden
+                $error = AnalyzeCommand($hash, "set $device $cmd $newVal") if defined($newVal);
+                Log3($hash->{NAME}, 1, $error) if (defined($error));
+            }
         }
     }
     # Antwort senden
