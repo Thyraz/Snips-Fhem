@@ -188,6 +188,9 @@ Details dazu in den folgenden Beschreibungen der einzelnen Intents.
     * __*maxVal*__ Maximal möglicher Stellwert
     * __*step*__ Schrittweite für relative Änderungen wie z.B. *Mach die Deckenlampe heller*
     * __*map*__ Bisher nur ein Wert für diese Option möglich: *percent*
+    * __*type*__ Zur Unterscheidung bei mehreren GetNumeric Intents in einem Device.\
+    Zum Beispiel für die Möglichkeit getrennt eingestellter Sollwert und Ist-Temperatur von einem Thermostat abzufragen.\
+    Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`, `Batterie`
   
   *Erläuterung zu map=percent:\
   Ist die Option gesetzt, werden alle numerischen Stellwerte als Prozentangaben zwischen minVal und maxVal verstanden.\
@@ -214,7 +217,7 @@ Optionen:
   * __*maxVal*__ nur nötig bei genutzter `map` Option
   * __*type*__ Zur Unterscheidung bei mehreren GetNumeric Intents in einem Device.\
     Zum Beispiel für die Möglichkeit getrennt eingestellter Sollwert und Ist-Temperatur von einem Thermostat abzufragen.\
-    Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`
+    Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`, `Batterie`
  
   Beispielsätze:
   > Wie ist die Temperatur vom Thermometer im Büro?\
