@@ -108,6 +108,21 @@ define Snips SNIPS SnipsMQTT Wohnzimmer
   müsst ihr updateModell erneut ausführen.\
   Auch nach dem Hinzufügen neuer Geräte, oder ändern/hinzufügen von snipsNames muss updateModell erneut ausgeführt werden.
 
+## Readings / Events
+
+* **lastIntentPayload**\
+  Daten des letzten Befehls der in FHEM ankam.
+
+* **listening_*roomname***\
+  Wechselt auf 1 wenn das Wakeword erkannt wurde\
+  und wieder auf 0 zurück wenn Snips nach der Antwort wieder in den "Standby" geht.
+  Ein Reading pro Snips Satellit/Installation.\
+  Kann z.B. verwendet werden um über ein Notify die Musik zu muten während Snips lauscht / spricht.
+ 
+* **voiceResponse** bzw. **textResponse**\
+  Antwort die Snips bei einem Sprachbefehle bzw. bei einem Aufruf über `set <snipsDevice> textCommand <text>`\
+  zurückgeliefert hat.
+  
 
 ## Geräte in FHEM für Snips sichtbar machen
 __Wichtig:__ Nach all den nachfolgenden Änderungen muss immer ein ```set <snipsDevice> modelUpdate``` ausgeführt werden.\
