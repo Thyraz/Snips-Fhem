@@ -150,12 +150,9 @@ Details dazu in den folgenden Beschreibungen der einzelnen Intents.
 
 * **SetOnOff**\
   Intent zum Ein-/Ausschalten, Öffnen/Schließen, Starten/Stoppen, ...\
-  Beispiel: `SetOnOff:valueOff=0,cmdOn=on,cmdOff=off`\
+  Beispiel: `SetOnOff:cmdOn=on,cmdOff=off`\
   \
   Optionen:\
-  *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.*
-    * __*valueOff*__ Wert von *currentValueReading* der als **off** gewertet wird
-    * __*valueOn*__ Wert von *currentValueReading* der als **on** gewertet wird
     * __*cmdOn*__ Befehl der das Gerät einschaltet
     * __*cmdOff*__ Befehl der das Gerät ausschaltet
 
