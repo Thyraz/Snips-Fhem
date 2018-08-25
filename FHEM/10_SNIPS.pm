@@ -653,11 +653,18 @@ sub handleIntentSetOnOff($$) {
             my $error;
             my $cmdOn  = (defined($mapping->{'cmdOn'}))  ? $mapping->{'cmdOn'}  :  "on";
             my $cmdOff = (defined($mapping->{'cmdOff'})) ? $mapping->{'cmdOff'} : "off";
-            $value = ($value eq 'an') ? $cmdOn : $cmdOff;
+            my $cmd = ($value eq 'an') ? $cmdOn : $cmdOff;
+
+            # Soll Command auf anderes Device umgelenkt werden?
+            if ($cmd =~ m/:/) {
+                $cmd =~ s/:/ /;
+            } else {
+                $cmd = "$device $cmd";
+            }
 
             $response = "Ok";
             # Gerät schalten
-            $error = AnalyzeCommand($hash, "set $device $value");
+            $error = AnalyzeCommand($hash, "set $cmd");
             Log3($hash->{NAME}, 1, $error) if (defined($error));
         }
     }
@@ -685,10 +692,13 @@ sub handleIntentGetOnOff($$) {
 
         # Mapping gefunden?
         if (defined($mapping)) {
-            my $reading = $mapping->{'currentVal'};
+            # Soll Reading von einem anderen Device gelesen werden?
+            my $readingsDev = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[0] : $device;
+            my $reading = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[1] : $mapping->{'currentVal'};
+
             my $valueOn   = (defined($mapping->{'valueOn'}))  ? $mapping->{'valueOn'}  : undef;
             my $valueOff  = (defined($mapping->{'valueOff'})) ? $mapping->{'valueOff'} : undef;
-            my $value = ReadingsVal($device, $reading, undef);
+            my $value = ReadingsVal($readingsDev, $reading, undef);
 
             # Entscheiden ob $value 0 oder 1 ist
             if (defined($valueOff)) {
@@ -762,7 +772,6 @@ sub handleIntentSetNumeric($$) {
             if (defined($mapping) && defined($mapping->{'cmd'})) {
                 my $error;
                 my $cmd     = $mapping->{'cmd'};
-                my $reading = $mapping->{'currentVal'};
                 my $part = $mapping->{'part'};
                 my $minVal  = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : 0; # Snips kann keine negativen Nummern bisher, daher erzwungener minVal
                 my $maxVal  = $mapping->{'maxVal'};
@@ -770,11 +779,22 @@ sub handleIntentSetNumeric($$) {
                 my $up      = (defined($change) && ($change =~ m/^(höher|heller|lauter|wärmer)$/)) ? 1 : 0;
                 my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent") ? 1 : 0;
 
+                # Soll Reading von einem anderen Device gelesen werden?
+                my $readingsDev = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[0] : $device;
+                my $reading = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[1] : $mapping->{'currentVal'};
+
+                # Soll Command auf anderes Device umgelenkt werden?
+                if ($cmd =~ m/:/) {
+                    $cmd =~ s/:/ /;
+                } else {
+                    $cmd = "$device $cmd";
+                }
+
                 # Alten Wert bestimmen
-                my $oldVal  = ReadingsVal($device, $reading, 0);
+                my $oldVal  = ReadingsVal($readingsDev, $reading, 0);
                 if (defined($part)) {
-                  my @tokens = split(/ /, $oldVal);
-                  $oldVal = $tokens[$part] if (@tokens >= $part);
+                    my @tokens = split(/ /, $oldVal);
+                    $oldVal = $tokens[$part] if (@tokens >= $part);
                 }
 
                 # Neuen Wert bestimmen
@@ -813,7 +833,7 @@ sub handleIntentSetNumeric($$) {
                 }
 
                 # Stellwert senden
-                $error = AnalyzeCommand($hash, "set $device $cmd $newVal") if defined($newVal);
+                $error = AnalyzeCommand($hash, "set $cmd $newVal") if defined($newVal);
                 Log3($hash->{NAME}, 1, $error) if (defined($error));
             }
         }
@@ -849,7 +869,10 @@ sub handleIntentGetNumeric($$) {
 
         # Mapping gefunden
         if (defined($mapping)) {
-            my $reading = $mapping->{'currentVal'};
+          # Soll Reading von einem anderen Device gelesen werden?
+            my $readingsDev = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[0] : $device;
+            my $reading = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[1] : $mapping->{'currentVal'};
+
             my $part = $mapping->{'part'};
             my $minVal  = $mapping->{'minVal'};
             my $maxVal  = $mapping->{'maxVal'};
@@ -857,7 +880,7 @@ sub handleIntentGetNumeric($$) {
             my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent" && defined($minVal) && defined($maxVal)) ? 1 : 0;
 
             # Zurückzuliefernden Wert bestimmen
-            $value = ReadingsVal($device, $reading, undef);
+            $value = ReadingsVal($readingsDev, $reading, undef);
             if (defined($part)) {
               my @tokens = split(/ /, $value);
               $value = $tokens[$part] if (@tokens >= $part);
