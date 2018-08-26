@@ -45,7 +45,7 @@ sub SNIPS_Initialize($) {
     $hash->{UndefFn} = "SNIPS::Undefine";
     $hash->{SetFn} = "SNIPS::Set";
     $hash->{AttrFn} = "SNIPS::Attr";
-    $hash->{AttrList} = "IODev defaultRoom snipsIntents:textField-long responseLevel " . $main::readingFnAttributes;
+    $hash->{AttrList} = "IODev defaultRoom snipsIntents:textField-long errorResponse " . $main::readingFnAttributes;
     $hash->{OnMessageFn} = "SNIPS::onmessage";
 
     main::LoadModule("MQTT");
@@ -523,11 +523,10 @@ sub respond($$$$) {
 sub errorResponse($) {
     my ($hash) = @_;
     my $response = "Da ist etwas schief gegangen.";
-    my $level = AttrVal($hash->{NAME}, "responseLevel", 999);
+    my $attrValue = AttrVal($hash->{NAME}, "errorResponse", undef);
 
-    if ($level == 0) {
-        $response = ""
-    }
+    $response = $attrValue if (defined($attrValue) && $attrValue ne "disabled");
+    $response = ""         if (defined($attrValue) && $attrValue eq "disabled");
 
     return $response;
 }
