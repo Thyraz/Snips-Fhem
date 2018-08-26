@@ -623,11 +623,11 @@ sub handleCustomIntent($$$) {
                 Log3($hash->{NAME}, 5, $@);
             }
         }
-    }
-    $response = "Da ist etwas schief gegangen." if (!defined($response));
+        $response = "Da ist etwas schief gegangen." if (!defined($response));
 
-    # Antwort senden
-    respond ($hash, $data->{'type'}, $data->{sessionId}, $response);
+        # Antwort senden
+        respond ($hash, $data->{'type'}, $data->{sessionId}, $response);
+    }
 }
 
 
@@ -715,6 +715,8 @@ sub handleIntentGetOnOff($$) {
             elsif ($status =~ m/^(an|aus)$/ && $value == 0) { $response = $data->{'Device'} . " ist ausgeschaltet"; }
             elsif ($status =~ m/^(auf|zu)$/ && $value == 1) { $response = $data->{'Device'} . " ist geöffnet"; }
             elsif ($status =~ m/^(auf|zu)$/ && $value == 0) { $response = $data->{'Device'} . " ist geschlossen"; }
+            elsif ($status =~ m/^(eingefahren|ausgefahren)$/ && $value == 1) { $response = $data->{'Device'} . " ist eingefahren"; }
+            elsif ($status =~ m/^(eingefahren|ausgefahren)$/ && $value == 0) { $response = $data->{'Device'} . " ist ausgefahren"; }
             elsif ($status =~ m/^(läuft|fertig)$/ && $value == 1) { $response = $data->{'Device'} . " läuft noch"; }
             elsif ($status =~ m/^(läuft|fertig)$/ && $value == 0) { $response = $data->{'Device'} . " ist fertig"; }
         }
