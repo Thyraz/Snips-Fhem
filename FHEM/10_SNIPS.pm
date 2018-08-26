@@ -45,7 +45,7 @@ sub SNIPS_Initialize($) {
     $hash->{UndefFn} = "SNIPS::Undefine";
     $hash->{SetFn} = "SNIPS::Set";
     $hash->{AttrFn} = "SNIPS::Attr";
-    $hash->{AttrList} = "IODev defaultRoom snipsIntents:textField-long " . $main::readingFnAttributes;
+    $hash->{AttrList} = "IODev defaultRoom snipsIntents:textField-long responseLevel " . $main::readingFnAttributes;
     $hash->{OnMessageFn} = "SNIPS::onmessage";
 
     main::LoadModule("MQTT");
@@ -519,6 +519,20 @@ sub respond($$$$) {
 }
 
 
+# Fehlertext festlegen
+sub errorResponse($) {
+    my ($hash) = @_;
+    my $response = "Da ist etwas schief gegangen.";
+    my $level = AttrVal($hash->{NAME}, "responseLevel", 999);
+
+    if ($level == 0) {
+        $response = ""
+    }
+
+    return $response;
+}
+
+
 # Text Kommando an SNIPS
 sub textCommand($$) {
     my ($hash, $text) = @_;
@@ -623,7 +637,7 @@ sub handleCustomIntent($$$) {
                 Log3($hash->{NAME}, 5, $@);
             }
         }
-        $response = "Da ist etwas schief gegangen." if (!defined($response));
+        $response = errorResponse($hash) if (!defined($response));
 
         # Antwort senden
         respond ($hash, $data->{'type'}, $data->{sessionId}, $response);
@@ -637,7 +651,7 @@ sub handleIntentSetOnOff($$) {
     my $value, my $device, my $room;
     my $mapping;
     my $sendData, my $json;
-    my $response = "Da ist etwas schief gegangen.";
+    my $response = errorResponse($hash);
 
     Log3($hash->{NAME}, 5, "handleIntentSetOnOff called");
 
@@ -679,7 +693,7 @@ sub handleIntentGetOnOff($$) {
     my $value, my $device, my $room, my $status;
     my $mapping;
     my $sendData, my $json;
-    my $response = "Da ist etwas schief gegangen.";
+    my $response = errorResponse($hash);
 
     Log3($hash->{NAME}, 5, "handleIntentGetOnOff called");
 
@@ -733,7 +747,7 @@ sub handleIntentSetNumeric($$) {
     my $mapping;
     my $sendData, my $json;
     my $validData = 0;
-    my $response = "Da ist etwas schief gegangen.";
+    my $response = errorResponse($hash);
 
     Log3($hash->{NAME}, 5, "handleIntentSetNumeric called");
 
@@ -851,7 +865,7 @@ sub handleIntentGetNumeric($$) {
     my $value, my $device, my $room, my $type;
     my $mapping;
     my $sendData, my $json;
-    my $response = "Da ist etwas schief gegangen.";
+    my $response = errorResponse($hash);
 
     Log3($hash->{NAME}, 5, "handleIntentGetNumeric called");
 
@@ -916,7 +930,7 @@ sub handleIntentStatus($$) {
     my $value, my $device, my $room;
     my $mapping;
     my $sendData, my $json;
-    my $response = "Da ist etwas schief gegangen.";
+    my $response = errorResponse($hash);
 
     Log3($hash->{NAME}, 5, "handleIntentStatus called");
 
