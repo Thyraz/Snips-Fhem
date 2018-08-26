@@ -127,8 +127,8 @@ define Snips SNIPS SnipsMQTT Wohnzimmer
   
 ## Attribute
 
-* **errorResponse***\
-  Standardtext den das Snips-Modul bei einem Fehler ausgibt.
+* **errorResponse**\
+  Standardtext den das Snips-Modul bei einem Fehler ausgibt.\
   Die Ausgabe kann durch den Wert `disabled` deaktiviert werden.
 
 * **snipsIntents**\
