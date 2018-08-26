@@ -11,6 +11,7 @@ https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-p
 [Modul Installation](#modul-installation)\
 [Befehle](#befehle)\
 [Readings](#readings--events)\
+[Attribute](#attribute)\
 [Geräte in FHEM für Snips sichtbar machen](#geräte-in-fhem-für-snips-sichtbar-machen)\
 [Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren](#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren)\
 [Anhang 1: Snips Installation](#snips-installation)\
@@ -124,7 +125,15 @@ define Snips SNIPS SnipsMQTT Wohnzimmer
   Antwort die Snips bei einem Sprachbefehle bzw. bei einem Aufruf über `set <snipsDevice> textCommand <text>`\
   zurückgeliefert hat.
   
+## Attribute
 
+* **errorResponse***\
+  Standardtext den das Snips-Modul bei einem Fehler ausgibt.
+  Die Ausgabe kann durch den Wert `disabled` deaktiviert werden.
+
+* **snipsIntents**\
+  Siehe Kapitel *Custom Intents erstellen*
+  
 ## Geräte in FHEM für Snips sichtbar machen
 __Wichtig:__ Nach all den nachfolgenden Änderungen muss immer ein ```set <snipsDevice> modelUpdate``` ausgeführt werden.\
 Dadurch wird das Vokabular von Snips um eure Geräte- und Raumnamen erweitert.\
@@ -169,8 +178,8 @@ Details dazu in den folgenden Beschreibungen der einzelnen Intents.
   Beispiel: `SetOnOff:cmdOn=on,cmdOff=off`\
   \
   Optionen:\
-    * __*cmdOn*__ Befehl der das Gerät einschaltet
-    * __*cmdOff*__ Befehl der das Gerät ausschaltet
+    * __*cmdOn*__ Befehl der das Gerät einschaltet. Kann auch auf ein anderes Gerät verweisen durch Format `Device:cmd`
+    * __*cmdOff*__ Befehl der das Gerät ausschaltet. Kann auch auf ein anderes Gerät verweisen durch Format `Device:cmd`
 
   Beispielsätze:
   > Schalte die Deckenlampe ein\
@@ -183,9 +192,9 @@ Details dazu in den folgenden Beschreibungen der einzelnen Intents.
   \
   Optionen:\
   *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.*
-    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann
-    * __*valueOff*__ Wert von *currentVal* Reading der als **off** gewertet wird
-    * __*valueOn*__ Wert von *currentVal* Reading der als **on** gewertet wird
+    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann. Kann auch auf ein anderes Gerät verweisen durch Format `Device:Reading`
+    * __*valueOff*__ Wert von *currentVal* Reading der als **off** gewertet wird. Kann auch auf ein anderes Gerät verweisen durch Format `Device:Reading`
+    * __*valueOn*__ Wert von *currentVal* Reading der als **on** gewertet wird. Kann auch auf ein anderes Gerät verweisen durch Format `Device:Reading`
 
   Beispielsätze:
   > Ist die Deckenlampe im Büro eingeschaltet?\
@@ -197,9 +206,9 @@ Details dazu in den folgenden Beschreibungen der einzelnen Intents.
   Beispiel: `SetNumeric:currentVal=pct,cmd=dim,minVal=0,maxVal=99,step=25`\
   \
   Optionen:
-    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann
+    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann. Kann auch auf ein anderes Gerät verweisen durch Format `Device:Reading`
     * __*part*__ Splittet *currentVal* Reading bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
-    * __*cmd*__ Set-Befehl des Geräts der ausgeführt werden soll. z.B. dim
+    * __*cmd*__ Set-Befehl des Geräts der ausgeführt werden soll. z.B. dim. Kann auch auf ein anderes Gerät verweisen durch Format `Device:cmd`
     * __*minVal*__ Minimal möglicher Stellwert
     * __*maxVal*__ Maximal möglicher Stellwert
     * __*step*__ Schrittweite für relative Änderungen wie z.B. *Mach die Deckenlampe heller*
@@ -226,7 +235,7 @@ Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstä
 Beispiel: `GetNumeric:currentVal=temperature,part=1`\
 \
 Optionen:
-  * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann
+  * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann. Kann auch auf ein anderes Gerät verweisen durch Format `Device:Reading`
   * __*part*__ Splittet *currentVal* Reading bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
   * __*map*__ Siehe Beschreibung im *SetNumeric* Intent. Hier wird rückwärts gerechnet um wieder Prozent zu erhalten
   * __*minVal*__ nur nötig bei genutzter `map` Option
