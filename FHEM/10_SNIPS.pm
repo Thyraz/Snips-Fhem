@@ -276,17 +276,20 @@ sub getDeviceByName($$$) {
             }
         }
     }
+
+    Log3($hash->{NAME}, 5, "Device selected: $device");
+
     return $device;
 }
 
 
-# Gerät über Raum, Intent und ggf. Type suchen.
-sub getDeviceByIntentAndType($$$$) {
+# Geräte über Raum, Intent und ggf. Type suchen.
+sub getDevicesByIntentAndType($$$$) {
     my ($hash, $room, $intent, $type) = @_;
     my $device;
+    my @partlyMatches, my @fullMatches;
     my $devspec = "room=Snips";
     my @devices = devspec2array($devspec);
-    my $roomMatched = 0;
 
     # devspec2array sendet bei keinen Treffern als einziges Ergebnis den devSpec String zurück
     return undef if (@devices == 1 && $devices[0] eq $devspec);
@@ -298,12 +301,29 @@ sub getDeviceByIntentAndType($$$$) {
         my $mapping = SNIPS::getMapping($hash, $_, $intent, $type, 1);
         next unless defined($mapping);
 
-        # Ohne Type reicht passender Intent für ersten Treffer. Mit Type muss dieser explizit matchen. Raum ist nicht zwingend, wird aber als Match bevorzugt
-        if (!defined($type) && (!defined($device) || grep( /^$room$/i, @rooms)) || (defined($type) && $type eq $mapping->{'type'} && (!defined($device) || grep( /^$room$/i, @rooms)))) {
-            $device = $_;
+        if (!defined($type) && !(grep(/^$room$/i, @rooms))) {
+            push @partlyMatches, $_;
         }
+        elsif (!defined($type) && grep(/^$room$/i, @rooms)) {
+            push @fullMatches, $_;
+        }
+        elsif (defined($type) && $type eq $mapping->{'type'} && !(grep(/^$room$/i, @rooms))) {
+            push @partlyMatches, $_;
+        }
+        elsif (defined($type) && $type eq $mapping->{'type'} && grep(/^$room$/i, @rooms)) {
+            push @fullMatches, $_;
+        }
+
+        # # Ohne Type reicht passender Intent für ersten Treffer. Mit Type muss dieser explizit matchen. Raum ist nicht zwingend, wird aber als Match bevorzugt
+        # if (!defined($type) && (!defined($device) || grep( /^$room$/i, @rooms)) || (defined($type) && $type eq $mapping->{'type'} && (!defined($device) || grep( /^$room$/i, @rooms)))) {
+        #     $device = $_;
+        # }
     }
-    return $device;
+
+    # Log3($hash->{NAME}, 5, "Device selected: $device");
+    # return $device;
+
+    return (@fullMatches > 0) ? @fullMatches : @partlyMatches;
 }
 
 
@@ -324,7 +344,7 @@ sub getMapping($$$$;$) {
         my %currentMapping = split(/(?<!\\),|=/, $_);
 
         # Erstes Mapping vom passenden Intent wählen (unabhängig vom Type), dann ggf. weitersuchen ob noch ein besserer Treffer mit passendem Type kommt
-        if (!defined($mapping) || (defined($type) && $matchedMapping->{'type'} ne $type && $currentMapping{'type'} eq $type)) {
+        if (!defined($matchedMapping) || (defined($type) && $matchedMapping->{'type'} ne $type && $currentMapping{'type'} eq $type)) {
             $matchedMapping = \%currentMapping;
 
             Log3($hash->{NAME}, 5, "snipsMapping selected: $_") if (!defined($disableLog) || (defined($disableLog) && $disableLog != 1));
@@ -491,6 +511,8 @@ sub onmessage($$$) {
             SNIPS::handleIntentGetNumeric($hash, $data);
         } elsif ($intent eq 'Status') {
             SNIPS::handleIntentStatus($hash, $data);
+        } elsif ($intent eq 'MediaControls') {
+            SNIPS::handleIntentMediaControls($hash, $data);
         } else {
             SNIPS::handleCustomIntent($hash, $intent, $data);
         }
@@ -777,7 +799,8 @@ sub handleIntentSetNumeric($$) {
         if (exists($data->{'Device'})) {
             $device = getDeviceByName($hash, $room, $data->{'Device'});
         } elsif (defined($type)) {
-            $device = getDeviceByIntentAndType($hash, $room, "SetNumeric", $type);
+            my @devices = getDevicesByIntentAndType($hash, $room, "SetNumeric", $type);
+            $device = shift(@devices);
         }
 
         if (defined($device)) {
@@ -877,7 +900,8 @@ sub handleIntentGetNumeric($$) {
         if (exists($data->{'Device'})) {
             $device = getDeviceByName($hash, $room, $data->{'Device'});
         } else {
-            $device = getDeviceByIntentAndType($hash, $room, "GetNumeric", $type);
+            my @devices = getDevicesByIntentAndType($hash, $room, "GetNumeric", $type);
+            $device = shift(@devices);
         }
 
         $mapping = getMapping($hash, $device, "GetNumeric", $type) if (defined($device));
@@ -954,7 +978,7 @@ sub handleIntentStatus($$) {
 # Eingehende "SetOnOff" Intents bearbeiten
 sub handleIntentMediaControls($$) {
     my ($hash, $data) = @_;
-    my $cmd, my $device, my $room;
+    my $command, my $device, my $room;
     my $mapping;
     my $sendData, my $json;
     my $response = errorResponse($hash);
@@ -962,28 +986,56 @@ sub handleIntentMediaControls($$) {
     Log3($hash->{NAME}, 5, "handleIntentMediaControls called");
 
     # Mindestens Kommando muss übergeben worden sein
-    if (exists($data->{'Comand'})) {
+    if (exists($data->{'Command'})) {
         $room = roomName($hash, $data);
-        $value = $data->{'Value'};
-        $device = getDeviceByName($hash, $room, $data->{'Device'});
+        $command = $data->{'Command'};
+
+        # Passendes Gerät suchen
+        if (exists($data->{'Device'})) {
+            $device = getDeviceByName($hash, $room, $data->{'Device'});
+        } else {
+            my @devices = getDevicesByIntentAndType($hash, $room, "MediaControls", undef);
+
+            # TODO: Im mapping Options activeVal, ValueOn, ValueOff nutzen um richtiges Device zu finden
+
+            $device = shift(@devices);
+        }
+
         $mapping = getMapping($hash, $device, "MediaControls", undef);
 
-        # Mapping gefunden?
         if (defined($device) && defined($mapping)) {
             my $error;
-            # my $cmd = ($value eq 'an') ? $cmdOn : $cmdOff;
+            my $cmd;
 
-            # # Soll Command auf anderes Device umgelenkt werden?
-            # if ($cmd =~ m/:/) {
-            #     $cmd =~ s/:/ /;
-            # } else {
-            #     $cmd = "$device $cmd";
-            # }
+            if ($command =~ m/^play$/i)  {
+                $cmd = $mapping->{'cmdPlay'};
+            }
+            elsif ($command =~ m/^pause$/i) {
+                $cmd = $mapping->{'cmdPause'};
+            }
+            elsif ($command =~ m/^stop$/i) {
+                $cmd = $mapping->{'cmdStop'};
+            }
+            elsif ($command =~ m/^vor$/i) {
+                $cmd = $mapping->{'cmdFwd'};
+            }
+            elsif ($command =~ m/^zurück$/i) {
+                $cmd = $mapping->{'cmdBack'};
+            }
 
-            $response = "Ok";
-            # Gerät schalten
-            $error = AnalyzeCommand($hash, "set $cmd");
-            Log3($hash->{NAME}, 1, $error) if (defined($error));
+            if (defined($cmd)) {
+                # Soll Command auf anderes Device umgelenkt werden?
+                if ($cmd =~ m/:/) {
+                    $cmd =~ s/:/ /;
+                } else {
+                    $cmd = "$device $cmd";
+                }
+
+                $response = "Ok";
+                # Gerät schalten
+                $error = AnalyzeCommand($hash, "set $cmd");
+                Log3($hash->{NAME}, 1, $error) if (defined($error));
+            }
         }
     }
     # Antwort senden
