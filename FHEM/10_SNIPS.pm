@@ -336,6 +336,33 @@ sub getDeviceByIntentAndType($$$$) {
 }
 
 
+sub getDeviceByMediaChannel($$$) {
+    my ($hash, $room, $channel) = @_;
+    my $device;
+    my $devspec = "room=Snips";
+    my @devices = devspec2array($devspec);
+
+    # devspec2array sendet bei keinen Treffern als einziges Ergebnis den devSpec String zurück
+    return undef if (@devices == 1 && $devices[0] eq $devspec);
+
+    foreach (@devices) {
+        # Array bilden mit Räumen des Devices
+        my @rooms = split(',', AttrVal($_,"snipsRoom",undef));
+        # Cmd mit passendem Intent vorhanden?
+        my $cmd = getCmd($hash, $_, "snipsChannels", $channel, 1);
+        next unless defined($cmd);
+
+        # Erster Treffer wälen, überschreiben falls besserer Treffer (Raum matched auch) kommt
+        if (!defined($device) || grep(/^$room$/i, @rooms)) {
+            $device = $_;
+        }
+    }
+    Log3($hash->{NAME}, 5, "Device selected: $device");
+
+    return $device;
+}
+
+
 # Aktives Gerät mit Medienausgabe suchen
 sub getActiveMediaDevice($$) {
     my ($hash, $room) = @_;
@@ -373,7 +400,7 @@ sub getActiveMediaDevice($$) {
 sub getMapping($$$$;$) {
     my ($hash, $device, $intent, $type, $disableLog) = @_;
     my @mappings, my $matchedMapping;
-    my $mappingsString = AttrVal($device,"snipsMapping",undef);
+    my $mappingsString = AttrVal($device, "snipsMapping", undef);
 
     # String in einzelne Mappings teilen
     @mappings = split(/\n/, $mappingsString);
@@ -381,7 +408,6 @@ sub getMapping($$$$;$) {
     foreach (@mappings) {
         # Nur Mappings vom gesuchten Typ verwenden
         next unless $_ =~ qr/^$intent/;
-
         $_ =~ s/$intent://;
         my %currentMapping = split(/(?<!\\),|=/, $_);
 
@@ -394,6 +420,29 @@ sub getMapping($$$$;$) {
     }
 
     return $matchedMapping;
+}
+
+
+# Cmd von Attribut mit dem Format value=cmd pro Zeile lesen
+sub getCmd($$$$;$) {
+    my ($hash, $device, $reading, $channel, $disableLog) = @_;
+    my @rows, my $cmd;
+    my $attrString = AttrVal($device, $reading, undef);
+
+    # String in einzelne Mappings teilen
+    @rows = split(/\n/, $attrString);
+
+    foreach (@rows) {
+        # Nur Zeilen mit gesuchten Channel verwenden
+        next unless $_ =~ qr/^$channel=/;
+        $_ =~ s/$channel=//;
+        $cmd = $_;
+
+        Log3($hash->{NAME}, 5, "cmd selected: $_") if (!defined($disableLog) || (defined($disableLog) && $disableLog != 1));
+        last;
+    }
+
+    return $cmd;
 }
 
 
@@ -691,7 +740,6 @@ sub handleCustomIntent($$$) {
     my ($hash, $intentName, $data) = @_;
     my @intents, my $intent;
     my $intentsString = AttrVal($hash->{NAME},"snipsIntents",undef);
-    my $sendData, my $json;
     my $response;
     my $error;
 
@@ -740,7 +788,6 @@ sub handleIntentSetOnOff($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room;
     my $mapping;
-    my $sendData, my $json;
     my $response = errorResponse($hash);
 
     Log3($hash->{NAME}, 5, "handleIntentSetOnOff called");
@@ -782,7 +829,6 @@ sub handleIntentGetOnOff($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room, my $status;
     my $mapping;
-    my $sendData, my $json;
     my $response = errorResponse($hash);
 
     Log3($hash->{NAME}, 5, "handleIntentGetOnOff called");
@@ -820,7 +866,6 @@ sub handleIntentSetNumeric($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room, my $change, my $type, my $unit;
     my $mapping;
-    my $sendData, my $json;
     my $validData = 0;
     my $response = errorResponse($hash);
 
@@ -939,7 +984,6 @@ sub handleIntentGetNumeric($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room, my $type;
     my $mapping;
-    my $sendData, my $json;
     my $response = errorResponse($hash);
 
     Log3($hash->{NAME}, 5, "handleIntentGetNumeric called");
@@ -1004,7 +1048,6 @@ sub handleIntentStatus($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room;
     my $mapping;
-    my $sendData, my $json;
     my $response = errorResponse($hash);
 
     Log3($hash->{NAME}, 5, "handleIntentStatus called");
@@ -1027,12 +1070,11 @@ sub handleIntentStatus($$) {
 }
 
 
-# Eingehende "SetOnOff" Intents bearbeiten
+# Eingehende "MediaControls" Intents bearbeiten
 sub handleIntentMediaControls($$) {
     my ($hash, $data) = @_;
     my $command, my $device, my $room;
     my $mapping;
-    my $sendData, my $json;
     my $response = errorResponse($hash);
 
     Log3($hash->{NAME}, 5, "handleIntentMediaControls called");
@@ -1078,6 +1120,32 @@ sub handleIntentMediaControls($$) {
     }
     # Antwort senden
     respond ($hash, $data->{'requestType'}, $data->{sessionId}, $response);
+}
+
+
+# Eingehende "MediaChannels" Intents bearbeiten
+sub handleIntentMediaChannels($$) {
+    my ($hash, $data) = @_;
+    my $channel, my $device, my $room;
+    my $mapping;
+    my $response = errorResponse($hash);
+
+    Log3($hash->{NAME}, 5, "handleIntentMediaChannels called");
+
+    # Mindestens Channel muss übergeben worden sein
+    if (exists($data->{'Channel'})) {
+        $room = roomName($hash, $data);
+        $channel = $data->{'Channel'};
+
+        # Passendes Gerät suchen
+        if (exists($data->{'Device'})) {
+            $device = getDeviceByName($hash, $room, $data->{'Device'});
+        } else {
+            @device = getDeviceByMediaChannel($hash, $room);
+        }
+
+        
+    }
 }
 
 
