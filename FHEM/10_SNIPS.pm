@@ -134,6 +134,9 @@ sub Set($$$@) {
     # Say Cmd
     if ($command eq "say") {
         my $text = join (" ", @values);
+
+        # TODO: Parameter über parseParams und dann say function noch einen Parameter siteId geben
+
         SNIPS::say($hash, $text);
     }
     # TextCommand Cmd
@@ -283,11 +286,10 @@ sub getDeviceByName($$$) {
 }
 
 
-# Geräte über Raum, Intent und ggf. Type suchen.
+# Sammelt Geräte über Raum Intent unt ggf. Type
 sub getDevicesByIntentAndType($$$$) {
     my ($hash, $room, $intent, $type) = @_;
-    my $device;
-    my @partlyMatches, my @fullMatches;
+    my @matchesInRoom, my @matchesOutsideRoom;
     my $devspec = "room=Snips";
     my @devices = devspec2array($devspec);
 
@@ -301,29 +303,69 @@ sub getDevicesByIntentAndType($$$$) {
         my $mapping = SNIPS::getMapping($hash, $_, $intent, $type, 1);
         next unless defined($mapping);
 
+        # Geräte sammeln
         if (!defined($type) && !(grep(/^$room$/i, @rooms))) {
-            push @partlyMatches, $_;
+            push @matchesOutsideRoom, $_;
         }
         elsif (!defined($type) && grep(/^$room$/i, @rooms)) {
-            push @fullMatches, $_;
+            push @matchesInRoom, $_;
         }
         elsif (defined($type) && $type eq $mapping->{'type'} && !(grep(/^$room$/i, @rooms))) {
-            push @partlyMatches, $_;
+            push @matchesOutsideRoom, $_;
         }
         elsif (defined($type) && $type eq $mapping->{'type'} && grep(/^$room$/i, @rooms)) {
-            push @fullMatches, $_;
+            push @matchesInRoom, $_;
         }
-
-        # # Ohne Type reicht passender Intent für ersten Treffer. Mit Type muss dieser explizit matchen. Raum ist nicht zwingend, wird aber als Match bevorzugt
-        # if (!defined($type) && (!defined($device) || grep( /^$room$/i, @rooms)) || (defined($type) && $type eq $mapping->{'type'} && (!defined($device) || grep( /^$room$/i, @rooms)))) {
-        #     $device = $_;
-        # }
     }
 
-    # Log3($hash->{NAME}, 5, "Device selected: $device");
-    # return $device;
+    return (\@matchesInRoom, \@matchesOutsideRoom);
+}
 
-    return (@fullMatches > 0) ? @fullMatches : @partlyMatches;
+
+# Geräte über Raum, Intent und ggf. Type suchen.
+sub getDeviceByIntentAndType($$$$) {
+    my ($hash, $room, $intent, $type) = @_;
+    my $device;
+    my $matchesInRoom, my $matchesOutsideRoom;
+
+    # Devices sammeln
+    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type);
+
+    # Erstes Device im passenden Raum zurückliefern falls vorhanden, sonst erstes Device außerhalb
+    return (@{$matchesInRoom} > 0) ? shift @{$matchesInRoom} : shift @{$matchesOutsideRoom};
+}
+
+
+# Aktives Gerät mit Medienausgabe suchen
+sub getActiveMediaDevice($$) {
+    my ($hash, $room) = @_;
+    my $device;
+    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, "MediaControls", undef);
+
+    # Anonyme Funktion zum finden des aktiven Geräts
+    my $activeDevice = sub ($$) {
+        my ($hash, $devices) = @_;
+        my $match;
+
+        foreach (@{$devices}) {
+            my $mapping = getMapping($hash, $_, "GetOnOff", undef, 1);
+            if (defined($mapping)) {
+                # Gerät ein- oder ausgeschaltet?
+                $value = getOnOffState($hash, $_, $mapping);
+                if ($value == 1) {
+                    $match == $_;
+                    last;
+                }
+            }
+        }
+        return $match;
+    };
+
+    # Gerät finden, erst im aktuellen Raum, sonst in den restlichen
+    $device = $activeDevice->($hash, $matchesInRoom);
+    $device = $activeDevice->($hash, $matchesOutsideRoom) if (!defined($device));
+
+    return $device;
 }
 
 
@@ -352,6 +394,33 @@ sub getMapping($$$$;$) {
     }
 
     return $matchedMapping;
+}
+
+
+# Zustand eines Gerätes über GetOnOff Mapping abfragen
+sub getOnOffState ($$$) {
+    my ($hash, $device, $mapping) = @_;
+    my $value;
+
+    # Soll Reading von einem anderen Device gelesen werden?
+    my $readingsDev = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[0] : $device;
+    my $reading = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[1] : $mapping->{'currentVal'};
+
+    my $valueOn   = (defined($mapping->{'valueOn'}))  ? $mapping->{'valueOn'}  : undef;
+    my $valueOff  = (defined($mapping->{'valueOff'})) ? $mapping->{'valueOff'} : undef;
+    my $value = ReadingsVal($readingsDev, $reading, undef);
+
+    # Entscheiden ob $value 0 oder 1 ist
+    if (defined($valueOff)) {
+        $value = (lc($value) eq lc($valueOff)) ? 0 : 1;
+    } elsif (defined($valueOn)) {
+        $value = (lc($value) eq lc($valueOn)) ? 1 : 0;
+    } else {
+        # valueOn und valueOff sind nicht angegeben worden, alles außer "off" wird als eine 1 gewertet
+        $value = (lc($value) eq "off") ? 0 : 1;
+    }
+
+    return $value;
 }
 
 
@@ -727,23 +796,8 @@ sub handleIntentGetOnOff($$) {
 
         # Mapping gefunden?
         if (defined($mapping)) {
-            # Soll Reading von einem anderen Device gelesen werden?
-            my $readingsDev = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[0] : $device;
-            my $reading = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[1] : $mapping->{'currentVal'};
-
-            my $valueOn   = (defined($mapping->{'valueOn'}))  ? $mapping->{'valueOn'}  : undef;
-            my $valueOff  = (defined($mapping->{'valueOff'})) ? $mapping->{'valueOff'} : undef;
-            my $value = ReadingsVal($readingsDev, $reading, undef);
-
-            # Entscheiden ob $value 0 oder 1 ist
-            if (defined($valueOff)) {
-                $value = (lc($value) eq lc($valueOff)) ? 0 : 1;
-            } elsif (defined($valueOn)) {
-                $value = (lc($value) eq lc($valueOn)) ? 1 : 0;
-            } else {
-                # valueOn und valueOff sind nicht angegeben worden, alles außer "off" wird als eine 1 gewertet
-                $value = (lc($value) eq "off") ? 0 : 1;
-            }
+            # Gerät ein- oder ausgeschaltet?
+            $value = getOnOffState($hash, $device, $mapping);
 
             # Antwort erstellen
             if    ($status =~ m/^(an|aus)$/ && $value == 1) { $response = $data->{'Device'} . " ist eingeschaltet"; }
@@ -795,12 +849,11 @@ sub handleIntentSetNumeric($$) {
             elsif ($change =~ m/^(lauter|leiser)$/)  { $type = "Lautstärke"; }
         }
 
-        # Gerät über Name oder Type suchen
+        # Gerät über Name suchen, oder falls über Lautstärke ohne Device getriggert wurde das ActiveMediaDevice suchen
         if (exists($data->{'Device'})) {
             $device = getDeviceByName($hash, $room, $data->{'Device'});
-        } elsif (defined($type)) {
-            my @devices = getDevicesByIntentAndType($hash, $room, "SetNumeric", $type);
-            $device = shift(@devices);
+        } elsif (defined($type) && $type = "Lautstärke") {
+            $device = getActiveMediaDevice($hash, $room);
         }
 
         if (defined($device)) {
@@ -900,8 +953,7 @@ sub handleIntentGetNumeric($$) {
         if (exists($data->{'Device'})) {
             $device = getDeviceByName($hash, $room, $data->{'Device'});
         } else {
-            my @devices = getDevicesByIntentAndType($hash, $room, "GetNumeric", $type);
-            $device = shift(@devices);
+            $device = getDeviceByIntentAndType($hash, $room, "GetNumeric", $type);
         }
 
         $mapping = getMapping($hash, $device, "GetNumeric", $type) if (defined($device));
@@ -994,11 +1046,7 @@ sub handleIntentMediaControls($$) {
         if (exists($data->{'Device'})) {
             $device = getDeviceByName($hash, $room, $data->{'Device'});
         } else {
-            my @devices = getDevicesByIntentAndType($hash, $room, "MediaControls", undef);
-
-            # TODO: Im mapping Options activeVal, ValueOn, ValueOff nutzen um richtiges Device zu finden
-
-            $device = shift(@devices);
+            @device = getActiveMediaDevice($hash, $room);
         }
 
         $mapping = getMapping($hash, $device, "MediaControls", undef);
@@ -1007,21 +1055,11 @@ sub handleIntentMediaControls($$) {
             my $error;
             my $cmd;
 
-            if ($command =~ m/^play$/i)  {
-                $cmd = $mapping->{'cmdPlay'};
-            }
-            elsif ($command =~ m/^pause$/i) {
-                $cmd = $mapping->{'cmdPause'};
-            }
-            elsif ($command =~ m/^stop$/i) {
-                $cmd = $mapping->{'cmdStop'};
-            }
-            elsif ($command =~ m/^vor$/i) {
-                $cmd = $mapping->{'cmdFwd'};
-            }
-            elsif ($command =~ m/^zurück$/i) {
-                $cmd = $mapping->{'cmdBack'};
-            }
+            if    ($command =~ m/^play$/i)   { $cmd = $mapping->{'cmdPlay'}; }
+            elsif ($command =~ m/^pause$/i)  { $cmd = $mapping->{'cmdPause'}; }
+            elsif ($command =~ m/^stop$/i)   { $cmd = $mapping->{'cmdStop'}; }
+            elsif ($command =~ m/^vor$/i)    { $cmd = $mapping->{'cmdFwd'}; }
+            elsif ($command =~ m/^zurück$/i) { $cmd = $mapping->{'cmdBack'}; }
 
             if (defined($cmd)) {
                 # Soll Command auf anderes Device umgelenkt werden?
