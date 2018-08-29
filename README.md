@@ -177,7 +177,7 @@ Details dazu in den folgenden Beschreibungen der einzelnen Intents.
   Intent zum Ein-/Ausschalten, Öffnen/Schließen, Starten/Stoppen, ...\
   Beispiel: `SetOnOff:cmdOn=on,cmdOff=off`\
   \
-  Optionen:\
+  Optionen:
     * __*cmdOn*__ Befehl der das Gerät einschaltet. Kann auch auf ein anderes Gerät verweisen durch Format `Device:cmd`
     * __*cmdOff*__ Befehl der das Gerät ausschaltet. Kann auch auf ein anderes Gerät verweisen durch Format `Device:cmd`
 
@@ -187,7 +187,7 @@ Details dazu in den folgenden Beschreibungen der einzelnen Intents.
   > Öffne den Rollladen im Wohnzimmer
 
 * **GetOnOff**\
-  Intent zur Zustandsabfrage von Schaltern, Kontakten, Geräten, ...
+  Intent zur Zustandsabfrage von Schaltern, Kontakten, Geräten, ...\
   Beispiel: `GetOnOff:currentVal=state,valueOff=closed`\
   \
   Optionen:\
