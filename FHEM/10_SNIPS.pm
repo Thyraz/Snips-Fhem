@@ -661,6 +661,8 @@ sub onmessage($$$) {
             SNIPS::handleIntentStatus($hash, $data);
         } elsif ($intent eq 'MediaControls') {
             SNIPS::handleIntentMediaControls($hash, $data);
+        } elsif ($intent eq 'MediaChannels') {
+            SNIPS::handleIntentMediaChannels($hash, $data);
         } else {
             SNIPS::handleCustomIntent($hash, $intent, $data);
         }
@@ -741,10 +743,10 @@ sub updateModel($) {
     my @channels = allSnipsChannels();
 
     # JSON Struktur erstellen
-    if (@devices > 0 || @rooms > 0) {
+    if (@devices > 0 || @rooms > 0 || @channels > 0) {
       my $json;
-      my $injectData, my $deviceData, my $roomData;
-      my @operations, my @deviceOperation, my @roomOperation;
+      my $injectData, my $deviceData, my $roomData, my $channelData;
+      my @operations, my @deviceOperation, my @roomOperation, @channelOperation;
 
       $deviceData->{'de.fhem.Device'} = \@devices;
       @deviceOperation = ('add', $deviceData);
@@ -752,8 +754,12 @@ sub updateModel($) {
       $roomData->{'de.fhem.Room'} = \@rooms;
       @roomOperation = ('add', $roomData);
 
+      $channelData->{'de.fhem.MediaChannels'} = \@channels;
+      @channelOperation = ('add', $channelData);
+
       push(@operations, \@deviceOperation) if @devices > 0;
       push(@operations, \@roomOperation) if @rooms > 0;
+      push(@operations, \@channelOperation) if @channels > 0;
 
       $injectData->{'operations'} = \@operations;
       $json = eval { toJSON($injectData) };
