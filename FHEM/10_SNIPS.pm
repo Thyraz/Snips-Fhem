@@ -61,7 +61,7 @@ use GPUtils qw(:all);
 use JSON;
 use Net::MQTT::Constants;
 use Encode;
-use Data::Dumper 'Dumper';
+# use Data::Dumper 'Dumper';
 
 BEGIN {
     MQTT->import(qw(:all));
@@ -464,8 +464,8 @@ sub getCmd($$$$;$) {
 
     foreach (@rows) {
         # Nur Zeilen mit gesuchten Channel verwenden
-        next unless $_ =~ qr/^$channel=/;
-        $_ =~ s/$channel=//;
+        next unless $_ =~ qr/^$channel=/i;
+        $_ =~ s/$channel=//i;
         $cmd = $_;
 
         Log3($hash->{NAME}, 5, "cmd selected: $_") if (!defined($disableLog) || (defined($disableLog) && $disableLog != 1));
@@ -543,6 +543,7 @@ sub parseJSON($$) {
         $data->{'siteId'} = $info->{'siteId'} if defined($info->{'siteId'});
         $data->{'Device'} = $info->{'Device'} if defined($info->{'Device'});
         $data->{'Room'} = $info->{'Room'} if defined($info->{'Room'});
+        $data->{'Channel'} = $info->{'Channel'} if defined($info->{'Channel'});
     }
 
     foreach (keys %{ $data }) {
@@ -580,9 +581,10 @@ sub onmessage($$$) {
     # Sprachintent von Snips empfangen -> Geräte- und Raumnamen ersetzen und Request erneut an NLU senden
     elsif ($topic =~ qr/^hermes\/intent\/.*:/) {
         my $info, my $sendData;
-        my $device, my $room;
+        my $device, my $room, my $channel;
         my @devices = allSnipsNames();
         my @rooms = allSnipsRooms();
+        my @channels = allSnipsChannels();
         my $json, my $infoJson;
         my $sessionId;
 
@@ -604,6 +606,13 @@ sub onmessage($$$) {
                 last;
             }
         }
+        foreach (@channels) {
+            if ($command =~ qr/$_/i) {
+                $channel = lc($_);
+                $command =~ s/$_/'standardsender'/i;
+                last;
+            }
+        }
 
         # Info Hash wird mit an NLU übergeben um die Rückmeldung später dem Request zuordnen zu können
         $info = {
@@ -611,7 +620,8 @@ sub onmessage($$$) {
             sessionId   => $data->{'sessionId'},
             siteId      => $data->{'siteId'},
             Device      => $device,
-            Room        => $room
+            Room        => $room,
+            Channel     => $channel
         };
         $infoJson = toJSON($info);
 
@@ -746,7 +756,7 @@ sub updateModel($) {
     if (@devices > 0 || @rooms > 0 || @channels > 0) {
       my $json;
       my $injectData, my $deviceData, my $roomData, my $channelData;
-      my @operations, my @deviceOperation, my @roomOperation, @channelOperation;
+      my @operations, my @deviceOperation, my @roomOperation, my @channelOperation;
 
       $deviceData->{'de.fhem.Device'} = \@devices;
       @deviceOperation = ('add', $deviceData);
@@ -1188,7 +1198,7 @@ sub handleIntentMediaChannels($$) {
             $device = getDeviceByMediaChannel($hash, $room, $channel);
         }
 
-        $cmd = getCmd($hash, "snipsChannels", $channel, undef);
+        $cmd = getCmd($hash, $device, "snipsChannels", $channel, undef);
 
         if (defined($device) && defined($cmd)) {
             my $error;
