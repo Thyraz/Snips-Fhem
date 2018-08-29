@@ -1171,7 +1171,7 @@ sub handleIntentMediaControls($$) {
 sub handleIntentMediaChannels($$) {
     my ($hash, $data) = @_;
     my $channel, my $device, my $room;
-    my $mapping;
+    my $cmd;
     my $response = errorResponse($hash);
 
     Log3($hash->{NAME}, 5, "handleIntentMediaChannels called");
@@ -1188,8 +1188,26 @@ sub handleIntentMediaChannels($$) {
             $device = getDeviceByMediaChannel($hash, $room, $channel);
         }
 
+        $cmd = getCmd($hash, "snipsChannels", $channel, undef);
 
+        if (defined($device) && defined($cmd)) {
+            my $error;
+
+            # Soll Command auf anderes Device umgelenkt werden?
+            if ($cmd =~ m/:/) {
+                $cmd =~ s/:/ /;
+            } else {
+                $cmd = "$device $cmd";
+            }
+
+            $response = "Ok";
+            # Gerät schalten
+            $error = AnalyzeCommand($hash, "set $cmd");
+            Log3($hash->{NAME}, 1, $error) if (defined($error));
+        }
     }
+    # Antwort senden
+    respond ($hash, $data->{'requestType'}, $data->{sessionId}, $response);
 }
 
 
