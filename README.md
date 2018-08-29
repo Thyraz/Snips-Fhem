@@ -26,7 +26,7 @@ Man legt dafür im Snips Konfigurator unter https://console.snips.ai einen Accou
 Jede App kann mehrere Intents beinhalten welche Slots für bestimmte Begriffe (z.B. Gerätenamen, Räume, Schaltzustände, ...) beinhaltet.\
 Man *trainiert* die Intents dann mit verschiedensten Beispielsätzen damit der Assistent nachher möglichst gut entscheiden kann was der Nutzer von ihm will.
 
-Snips kann so sehr gut verschiedene Intents unterscheiden, ohne dass diese z.B. wie bei Alexa mit ansagen muss.\
+Snips kann so sehr gut verschiedene Intents unterscheiden, ohne dass man diese z.B. wie bei Alexa mit ansagen muss.\
 Es ist also nicht wie bei Alexa Custom Skills nötig eine Frage so zu bilden:
 > Alexa, frage SmartHome wie viele Fenster sind geöffnet?
 
@@ -217,7 +217,7 @@ Details dazu in den folgenden Beschreibungen der einzelnen Intents.
     Zum Beispiel für die Möglichkeit getrennt eingestellter Sollwert und Ist-Temperatur von einem Thermostat abzufragen.\
     Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`, `Batterie`
   
-  *Erläuterung zu map=percent:\
+  *__Erläuterung zu map=percent:__\
   Ist die Option gesetzt, werden alle numerischen Stellwerte als Prozentangaben zwischen minVal und maxVal verstanden.\
   Bei einer Lampe mit `minVal=0` und `maxVal=255` und `map=percent` verhält sich also **Stelle die Lampe auf 50**\
   genauso wie **Stelle die Lampe auf 50 Prozent**.\
@@ -225,10 +225,19 @@ Details dazu in den folgenden Beschreibungen der einzelnen Intents.
   Beim Sollwert eines Thermostats hingegen wird man die Option eher nicht nutzen,\
   da dort die Angaben normal in °C erfolgen und nicht prozentual zum möglichen Sollwertbereich.*
   
+  *__Besonderheit bei type=Lautstärke__\
+  Um die Befehle `leiser`und `lauter` ohne Angabe eines Gerätes verwenden zu können,\
+  muss das Modul bestimmen welches Ausgabegerät gerade verwendet wird.\
+  Hierfür wird mithilfe des GetOnOff Mappings geprüft welches Gerät mit type=Lautstärke eingeschaltet ist.\
+  Dabei wird zuerst im aktuellen snipsRoom gesucht, dananch im Rest falls kein Treffer erfolgt ist.\
+  Es empfiehlt sich daher bei Verwendung von type=Lautstärke auch immer ein GetOnOff Mapping einzutragen.\
+  Ein `Gerätename lauter` bzw. `Gerätename leiser` ist unabhängig dieser Sonderbehandlung natürlich immer möglich.
+  
   Beispielsätze:
   > Stelle die Deckenlampe auf 30 Prozent\
   > Mach das Radio leiser\
   > Stelle die Heizung im Büro um 2 Grad wärmer
+  > Lauter
 
 * **GetNumeric**\
 Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstärke, ...
