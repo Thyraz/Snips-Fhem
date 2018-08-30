@@ -135,7 +135,7 @@ define Snips SNIPS SnipsMQTT Wohnzimmer
   Siehe Kapitel *Custom Intents erstellen*
   
 ## Geräte in FHEM für Snips sichtbar machen
-__Wichtig:__ Nach all den nachfolgenden Änderungen muss immer ein ```set <snipsDevice> modelUpdate``` ausgeführt werden.\
+__Wichtig:__ Nach all den nachfolgenden Änderungen muss immer ein ```set <snipsDevice> updateModel``` ausgeführt werden.\
 Dadurch wird das Vokabular von Snips um eure Geräte- und Raumnamen erweitert.\
 Dies muss ebenfall ausgeführt werden nachdem eine neue Version eureres Assistenten (manuell oder über *sam install assistant*) installiert wurde,\
 da hier die nachträglich durch FHEM angelernten Worte wieder verloren gehen.
@@ -397,7 +397,7 @@ wurde evtl. das ASR Inject Paket nicht installiert:\
 [Installation ASR Injection](#wichtig-asr-injection-installieren)
 
 Sollte Snips nach Aktualisierung eures Assistenten, dem Hinzufügen neuer Geräte, oder dem Ändern von snipsName oder snipsRoom Attributen Geräte- oder Raumbezeichnungen nicht mehr verstehen,\
-bitte sicherstellen, dass ```set <snipsDevice> modelUpdate``` ausgeführt wurde.
+bitte sicherstellen, dass ```set <snipsDevice> updateModel``` ausgeführt wurde.
 
 ## Snips Installation
 
