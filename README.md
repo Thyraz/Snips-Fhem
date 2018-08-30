@@ -108,7 +108,7 @@ define Snips SNIPS SnipsMQTT Wohnzimmer
   Snips verwirft die angelernten Wörter wenn ihr einen neuen Assistenten installiert.\
   Kopiert ihr also einen neuen Assistenten (oder eine neue Version des aktuellen Assistenten) auf den Rechner,\
   müsst ihr updateModell erneut ausführen.\
-  Auch nach dem Hinzufügen neuer Geräte, oder ändern/hinzufügen von snipsNames muss updateModell erneut ausgeführt werden.
+  Auch nach dem Hinzufügen neuer snipsNames, snipsRoom oder MediaChannels muss updateModell erneut ausgeführt werden.
 
 ## Readings / Events
 
