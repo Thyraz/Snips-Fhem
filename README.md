@@ -298,6 +298,41 @@ Optionen:
   > Wiedergabe stoppen\
   > Weiter\
   > Zurück
+  
+* **MediaChannels**\
+  Intent zum Abspielen von Radio-/Fernsehsendern, Favoriten, Playlists, ...
+  
+  Anstatt im Attribut snipsMapping eingetragen zu werden,\
+  wird Der Intent über ein eigenes Attribut `snipsChannels` im jeweiligen Gerät konfiguriert.\
+  Grund dafür ist die mehrzeilige Konfiguration des Intents.\
+  \
+  Um dem Device das neue Attribut hinzuzufügen, muss das Attribut _userattr_ befüllt werden:\
+  `attr <deviceName> userattr snipsChannels:textField-long`\
+  \
+  Danach kann das Attribut `snipsChannels` befüllt werden.\
+  Pro Zeile ein Eintrag im Format *Channelbezeichnung:cmd*\
+  *Channelbezeichnung* ist der Name den ihr sprechen wollt, *cmd* der Set-Befehl des Geräts.\
+  Dieser kann mit dem Format `Device:cmd` auch auf ein anderes Gerät verweisen.\
+  \
+  Beispiel:
+  ```
+  SWR3=favorite s_w_r_3
+  SWR1=favorite s_w_r_1
+  Das Ding=favorite das_ding
+  BigFM=favorite bigfm
+  ```
+  
+   *__Hinweis zu Befehlen ohne Nennung des Gerätenamens:__\
+  Um die Wiedergabe ohne Angabe eines Gerätes starten zu können,\
+  muss das Modul bestimmen welches Ausgabegerät verwendet werden soll.\
+  Hierzu sucht das Modul über das Attribut `snipsChannels` nach einem passenden Device.
+  Treffer im aktuellen (bzw. angesprochenen) Raum werden bevorzugt.*
+  
+  Beispielsätze:
+  > Spiele SWR3 auf dem Radio im Büro\
+  > Spiele SWR1\
+  > Schalte um auf BigFM\
+  > Sender vom Radio auf Das Ding wechseln
 
 ## Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren
 
