@@ -425,6 +425,41 @@ sub getDeviceByMediaChannel($$$) {
 }
 
 
+# Mappings in Key/Value Paare aufteilen
+sub splitMappingString($) {
+    my ($mapping) = @_;
+    my @tokens, my $token = '';
+    my $char, my $lastChar = '';
+    my $bracketLevel = 0;
+    my %parsedMapping;
+
+    # String in Kommagetrennte Tokens teilen
+    foreach $char (split(//, $mapping)) {
+        if ($char eq '{' && $lastChar ne '\\') {
+            $bracketLevel += 1;
+            $token .= $char;
+        }
+        elsif ($char eq '}' && $lastChar ne '\\') {
+            $bracketLevel -= 1;
+            $token .= $char;
+        }
+        elsif ($char eq ',' && $lastChar ne '\\' && $bracketLevel == 0) {
+            push(@tokens, $token);
+            $token = '';
+        }
+        else {
+            $token .= $char;
+        }
+    }
+    push(@tokens, $token) if (length($token) > 0);
+
+    # Tokens in Keys/Values trennen
+    my %parsedMapping = map {split /=/, $_, 2} @tokens;
+
+    return %parsedMapping;
+}
+
+
 # snipsMapping parsen und gefundene Settings zurückliefern
 sub getMapping($$$$;$) {
     my ($hash, $device, $intent, $type, $disableLog) = @_;
@@ -439,7 +474,7 @@ sub getMapping($$$$;$) {
             # Nur Mappings vom gesuchten Typ verwenden
             next unless $_ =~ qr/^$intent/;
             $_ =~ s/$intent://;
-            my %currentMapping = split(/(?<!\\),|=/, $_);
+            my %currentMapping = splitMappingString($_);
 
             # Erstes Mapping vom passenden Intent wählen (unabhängig vom Type), dann ggf. weitersuchen ob noch ein besserer Treffer mit passendem Type kommt
             if (!defined($matchedMapping) || (defined($type) && $matchedMapping->{'type'} ne $type && $currentMapping{'type'} eq $type)) {
@@ -487,9 +522,14 @@ sub runCmd($$$;$) {
         # my %specials = ("%VALUE" => $val, "%DEVICE" => $device);
         # $cmd = EvalSpecials($cmd, %specials);
         # $errors = AnalyzePerlCommand ($hash, $cmd);
-        # Variablen in Perl-String ersetzen
-        $cmd =~ s/\$DEVICE/$device/;
-        $cmd =~ s/\$VALUE/$val/;
+
+        # # Variablen in Perl-String ersetzen
+        # $cmd =~ s/\$DEVICE/$device/;
+        # $cmd =~ s/\$VALUE/$val/;
+
+        my $DEVICE = $device;
+        my $VALUE = $val;
+
         # CMD ausführen
         eval $cmd;
         Log3($hash->{NAME}, 1, $@) if ($@);
@@ -520,14 +560,9 @@ sub getValue($$$) {
     my ($hash, $device, $getString) = @_;
     my $value;
 
-    Log3($hash->{NAME}, 5, "GetString before: $getString");
-
     # Perl Command?
     if ($getString =~ m/^\s*{.*}\s*$/) {
-        # Variablen in Perl-String ersetzen
-        $getString =~ s/\$DEVICE/$device/;
-
-        Log3($hash->{NAME}, 5, "GetString after: $getString");
+        my $DEVICE = $device;
 
         # Wert lesen
         $value = eval $getString;
