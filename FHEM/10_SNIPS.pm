@@ -355,7 +355,6 @@ sub getDevicesByIntentAndType($$$$) {
 sub getDeviceByIntentAndType($$$$) {
     my ($hash, $room, $intent, $type) = @_;
     my $device;
-    my $matchesInRoom, my $matchesOutsideRoom;
 
     # Devices sammeln
     my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type);
@@ -480,30 +479,37 @@ sub getCmd($$$$;$) {
 # Cmd String im Format 'cmd', 'device:cmd' oder '{<perlcode}' ausführen
 sub runCmd($$$;$) {
     my ($hash, $device, $cmd, $val) = @_;
-    my @errors, my $error;
+    my $errors = ();
+    my $error;
 
     # Perl Command?
     if ($cmd =~ m/^\s*{.*}\s*$/) {
-        my %specials = ("%VALUE" => $val);
-        $cmd = EvalSpecials($cmd, %specials);
-        $errors = AnalyzePerlCommand ($client_hash, $cmds);
+        # my %specials = ("%VALUE" => $val, "%DEVICE" => $device);
+        # $cmd = EvalSpecials($cmd, %specials);
+        # $errors = AnalyzePerlCommand ($hash, $cmd);
+        # Variablen in Perl-String ersetzen
+        $cmd =~ s/\$DEVICE/$device/;
+        $cmd =~ s/\$VALUE/$val/;
+        # CMD ausführen
+        eval $cmd;
+        Log3($hash->{NAME}, 1, $@) if ($@);
     }
     # Soll Command auf anderes Device umgelenkt werden?
     elsif ($cmd =~ m/:/) {
         $cmd =~ s/:/ /;
         $cmd = $cmd . ' ' . $val if (defined($val));
         $error = AnalyzeCommand($hash, "set $cmd");
-        push(@errors, $error) if (defined($error));
+        push(@{$errors}, $error) if (defined($error));
     }
     # Nur normales Fhem Cmd angegeben
     else {
         $cmd = "$device $cmd";
         $cmd = $cmd . ' ' . $val if (defined($val));
         $error = AnalyzeCommand($hash, "set $cmd");
-        push(@errors, $error) if (defined($error));
+        push(@{$errors}, $error) if (defined($error));
     }
 
-    foreach (@errors) {
+    foreach (@{$errors}) {
         Log3($hash->{NAME}, 1, $_);
     }
 }
@@ -514,19 +520,24 @@ sub getValue($$$) {
     my ($hash, $device, $getString) = @_;
     my $value;
 
+    Log3($hash->{NAME}, 5, "GetString before: $getString");
+
     # Perl Command?
-    if ($cmd =~ m/^\s*{.*}\s*$/) {
-        # Variablen in Perl-Command ersetzen
-        $cmd =~ s/\$DEVICE/$device/;
+    if ($getString =~ m/^\s*{.*}\s*$/) {
+        # Variablen in Perl-String ersetzen
+        $getString =~ s/\$DEVICE/$device/;
+
+        Log3($hash->{NAME}, 5, "GetString after: $getString");
+
         # Wert lesen
-        $value = eval $cmd;
+        $value = eval $getString;
         Log3($hash->{NAME}, 1, $@) if ($@);
     }
     # Fhem Command
     else {
       # Soll Reading von einem anderen Device gelesen werden?
-      my $readingsDev = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[0] : $device;
-      my $reading = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[1] : $mapping->{'currentVal'};
+      my $readingsDev = ($getString =~ m/:/) ? (split(/:/, $getString))[0] : $device;
+      my $reading = ($getString =~ m/:/) ? (split(/:/, $getString))[1] : $getString;
 
       $value = ReadingsVal($readingsDev, $reading, 0);
     }
