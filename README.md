@@ -193,8 +193,8 @@ Details dazu in den folgenden Beschreibungen der einzelnen Intents.
   Optionen:\
   *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.*
     * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann. Kann auch auf ein anderes Gerät verweisen durch Format `Device:Reading`
-    * __*valueOff*__ Wert von *currentVal* Reading der als **off** gewertet wird. Kann auch auf ein anderes Gerät verweisen durch Format `Device:Reading`
-    * __*valueOn*__ Wert von *currentVal* Reading der als **on** gewertet wird. Kann auch auf ein anderes Gerät verweisen durch Format `Device:Reading`
+    * __*valueOff*__ Wert von *currentVal* Reading der als **off** gewertet wird.
+    * __*valueOn*__ Wert von *currentVal* Reading der als **on** gewertet wird.
 
   Beispielsätze:
   > Ist die Deckenlampe im Büro eingeschaltet?\
