@@ -51,6 +51,22 @@ sub SNIPS_Initialize($) {
     main::LoadModule("MQTT");
 }
 
+# Cmd in main:: ausführen damit User den Prefix nicht vor alle Perl-Aufrufe schreiben muss
+sub SNIPS_execute($$$$) {
+    my ($hash, $cmd, $device, $value) = @_;
+    my $returnVal;
+
+    # Nutervariablen setzen
+    my $DEVICE = $device;
+    my $VALUE = $value;
+
+    # CMD ausführen
+    $returnVal = eval $cmd;
+    Log3($hash->{NAME}, 1, $@) if ($@);
+
+    return $returnVal;
+}
+
 
 package SNIPS;
 
@@ -527,13 +543,8 @@ sub runCmd($$$;$) {
 
     # Perl Command?
     if ($cmd =~ m/^\s*{.*}\s*$/) {
-        # Nutervariablen setzen
-        my $DEVICE = $device;
-        my $VALUE = $val;
-
         # CMD ausführen
-        eval $cmd;
-        Log3($hash->{NAME}, 1, $@) if ($@);
+        main::SNIPS_execute($hash, $cmd, $device, $val);
     }
     # Soll Command auf anderes Device umgelenkt werden?
     elsif ($cmd =~ m/:/) {
@@ -560,11 +571,12 @@ sub getValue($$$) {
     # Perl Command?
     if ($getString =~ m/^\s*{.*}\s*$/) {
         # Nutervariablen setzen
-        my $DEVICE = $device;
+        #my $DEVICE = $device;
 
         # Wert lesen
-        $value = eval $getString;
-        Log3($hash->{NAME}, 1, $@) if ($@);
+        #$value = eval $getString;
+        #Log3($hash->{NAME}, 1, $@) if ($@);
+        $value = main::SNIPS_execute($hash, $getString, $device, undef);
     }
     # Fhem Command
     else {
