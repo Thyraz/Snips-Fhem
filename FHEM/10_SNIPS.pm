@@ -360,7 +360,11 @@ sub getDeviceByIntentAndType($$$$) {
     my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type);
 
     # Erstes Device im passenden Raum zurückliefern falls vorhanden, sonst erstes Device außerhalb
-    return (@{$matchesInRoom} > 0) ? shift @{$matchesInRoom} : shift @{$matchesOutsideRoom};
+    $device = (@{$matchesInRoom} > 0) ? shift @{$matchesInRoom} : shift @{$matchesOutsideRoom};
+
+    Log3($hash->{NAME}, 5, "Device selected: $device");
+
+    return $device;
 }
 
 
@@ -393,6 +397,8 @@ sub getActiveDeviceForIntentAndType($$$$) {
     $device = $activeDevice->($hash, $matchesInRoom);
     $device = $activeDevice->($hash, $matchesOutsideRoom) if (!defined($device));
 
+    Log3($hash->{NAME}, 5, "Device selected: $device");
+
     return $device;
 }
 
@@ -419,6 +425,7 @@ sub getDeviceByMediaChannel($$$) {
             $device = $_;
         }
     }
+
     Log3($hash->{NAME}, 5, "Device selected: $device");
 
     return $device;
@@ -450,6 +457,8 @@ sub splitMappingString($) {
         else {
             $token .= $char;
         }
+
+        $lastChar = $char;
     }
     push(@tokens, $token) if (length($token) > 0);
 
@@ -514,19 +523,11 @@ sub getCmd($$$$;$) {
 # Cmd String im Format 'cmd', 'device:cmd' oder '{<perlcode}' ausführen
 sub runCmd($$$;$) {
     my ($hash, $device, $cmd, $val) = @_;
-    my $errors = ();
     my $error;
 
     # Perl Command?
     if ($cmd =~ m/^\s*{.*}\s*$/) {
-        # my %specials = ("%VALUE" => $val, "%DEVICE" => $device);
-        # $cmd = EvalSpecials($cmd, %specials);
-        # $errors = AnalyzePerlCommand ($hash, $cmd);
-
-        # # Variablen in Perl-String ersetzen
-        # $cmd =~ s/\$DEVICE/$device/;
-        # $cmd =~ s/\$VALUE/$val/;
-
+        # Nutervariablen setzen
         my $DEVICE = $device;
         my $VALUE = $val;
 
@@ -539,19 +540,15 @@ sub runCmd($$$;$) {
         $cmd =~ s/:/ /;
         $cmd = $cmd . ' ' . $val if (defined($val));
         $error = AnalyzeCommand($hash, "set $cmd");
-        push(@{$errors}, $error) if (defined($error));
     }
     # Nur normales Fhem Cmd angegeben
     else {
         $cmd = "$device $cmd";
         $cmd = $cmd . ' ' . $val if (defined($val));
         $error = AnalyzeCommand($hash, "set $cmd");
-        push(@{$errors}, $error) if (defined($error));
     }
 
-    foreach (@{$errors}) {
-        Log3($hash->{NAME}, 1, $_);
-    }
+    Log3($hash->{NAME}, 1, $_) if (defined($error));
 }
 
 
@@ -562,6 +559,7 @@ sub getValue($$$) {
 
     # Perl Command?
     if ($getString =~ m/^\s*{.*}\s*$/) {
+        # Nutervariablen setzen
         my $DEVICE = $device;
 
         # Wert lesen
