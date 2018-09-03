@@ -13,6 +13,19 @@ https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-p
 [Readings](#readings--events)\
 [Attribute](#attribute)\
 [Geräte in FHEM für Snips sichtbar machen](#geräte-in-fhem-für-snips-sichtbar-machen)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Der Raum Snips](#raum-snips)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Attribut snipsName](#attribut-snipsname)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Attribut snipsRoom](#attribut-snipsroom)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Intents über snipsMapping zuordnen](#intents-%C3%BCber-snipsmapping-zuordnen)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Formatierung von CMDs und Readings innerhalb eines snipsMappings](#formatierung-von-cmds-und-readings-innerhalb-eines-snipsmappings)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Standard-Intents](#standard-intents)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[SetOnOff](#setonoff)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[GetOnOff](#getonoff)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[SetNumeric](#setnumeric)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[GetNumeric](#getnumeric)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Status](#status)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[MediaControls](#mediacontrols)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[MediaChannels](#mediachannels)\
 [Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren](#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren)\
 [Anhang 1: Snips Installation](#snips-installation)\
 [Anhang 2: Erweiterungen für Snips](#erweiterungen-für-snips)
@@ -166,49 +179,66 @@ Das Mapping folgt dabei dem Schema:
 ```
 IntentName:option1=value1,option2=value2,...
 ```
-Bei einigen Intents gibt es die Option *currentVal*,\
-bei der das Reading angegeben wird aus dem der aktuelle Wert ausgelesen werden kann.\
-Für einen GetNumeric Intent kann das z.B. das Reading sein, welches den aktuell gesetzten Helligkeitswert zurückliefert.\
-Liefert das Device zusätzlich zu der benötigten Info noch eine Einheit wie z.B. `5 °C`,\
-kann die Zahl über die Option *part=0* extrahiert werden.\
-Details dazu in den folgenden Beschreibungen der einzelnen Intents.
 
-* **SetOnOff**\
+#### Formatierung von CMDs und Readings innerhalb eines snipsMappings
+Einige Intents haben als Option auszuführende FHEM Kommandos oder Readings über die das Modul aktuelle Werte lesen kann.\
+Diese können in der Regel auf 3 Arten angegeben werden:
+* Set Kommando bzw. Reading des aktuellen Devices direkt angeben:\
+  `cmd=on` bzw. `currentReading=temperature`
+* Kommando oder Reading auf ein anderes Gerät umleiten:\
+  `cmd=Otherdecice:on` bzw. `currentReading=Otherdevice:temperature`
+* Perl-Code um ein Kommando auszuführen, oder einen Wert zu bestimmen.\
+  Dies ermöglicht komplexere Abfragen oder das freie Zusammensetzen von Befehle.\
+  Der Code muss in geschweiften Klammern angegeben werden: \
+  `{currentVal={ReadingsVal($DEVICE,"state",0)}`\
+  oder\
+  `cmd={fhem("set $DEVICE dim $VALUE")}`\
+  Innerhalb der geschweiften Klammern kann über $DEVICE auf das aktuelle Gerät zugegriffen werden.\
+  Bei der *cmd* Option von *SetNumeric* wird außerdem der zu setzende Wert über $VALUE bereit gestellt.
+
+Gibt man bei der Option `currentVal` das Reading im Format *reading* oder *Device:reading* an,\
+kann mit der Option `part` das Reading an Leerzeichen getrennt werden.\
+Über `part=1` bestimmt ihr, dass nur der erst Teil des Readings übernommen werden soll.\
+Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
+
+#### Standard-Intents
+
+* ##### SetOnOff
   Intent zum Ein-/Ausschalten, Öffnen/Schließen, Starten/Stoppen, ...\
   Beispiel: `SetOnOff:cmdOn=on,cmdOff=off`\
   \
   Optionen:
-    * __*cmdOn*__ Befehl der das Gerät einschaltet. Kann auch auf ein anderes Gerät verweisen durch Format `Device:cmd`
-    * __*cmdOff*__ Befehl der das Gerät ausschaltet. Kann auch auf ein anderes Gerät verweisen durch Format `Device:cmd`
+    * __*cmdOn*__ Befehl der das Gerät einschaltet. Siehe Kapitel zur Formatierung von CMDs.
+    * __*cmdOff*__ Befehl der das Gerät ausschaltet. Siehe Kapitel zur Formatierung von CMDs.
 
   Beispielsätze:
   > Schalte die Deckenlampe ein\
   > Mache das Radio an\
   > Öffne den Rollladen im Wohnzimmer
 
-* **GetOnOff**\
+* ##### GetOnOff
   Intent zur Zustandsabfrage von Schaltern, Kontakten, Geräten, ...\
   Beispiel: `GetOnOff:currentVal=state,valueOff=closed`\
   \
   Optionen:\
   *Hinweis: es muss nur valueOn ODER valueOff gesetzt werden. Alle anderen Werte werden jeweils dem anderen Status zugeordnet.*
-    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann. Kann auch auf ein anderes Gerät verweisen durch Format `Device:Reading`
-    * __*valueOff*__ Wert von *currentVal* Reading der als **off** gewertet wird. Kann auch auf ein anderes Gerät verweisen durch Format `Device:Reading`
-    * __*valueOn*__ Wert von *currentVal* Reading der als **on** gewertet wird. Kann auch auf ein anderes Gerät verweisen durch Format `Device:Reading`
+    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann. Siehe Kapitel zur Formatierung von Readings.
+    * __*valueOff*__ Wert von *currentVal* Reading der als **off** gewertet wird.
+    * __*valueOn*__ Wert von *currentVal* Reading der als **on** gewertet wird.
 
   Beispielsätze:
   > Ist die Deckenlampe im Büro eingeschaltet?\
   > Ist das Fenster im Bad geöffnet?\
   > Läuft die Waschmaschine?
   
-* **SetNumeric**\
+* ##### SetNumeric
   Intent zum Dimmen, Lautstärke einstellen, Temperatur einstellen, ...\
   Beispiel: `SetNumeric:currentVal=pct,cmd=dim,minVal=0,maxVal=99,step=25`\
   \
   Optionen:
-    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann. Kann auch auf ein anderes Gerät verweisen durch Format `Device:Reading`
+    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann. Siehe Kapitel zur Formatierung von Readings.
     * __*part*__ Splittet *currentVal* Reading bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
-    * __*cmd*__ Set-Befehl des Geräts der ausgeführt werden soll. z.B. dim. Kann auch auf ein anderes Gerät verweisen durch Format `Device:cmd`
+    * __*cmd*__ Set-Befehl des Geräts der ausgeführt werden soll. z.B. dim. Siehe Kapitel zur Formatierung von CMDs.
     * __*minVal*__ Minimal möglicher Stellwert
     * __*maxVal*__ Maximal möglicher Stellwert
     * __*step*__ Schrittweite für relative Änderungen wie z.B. *Mach die Deckenlampe heller*
@@ -239,19 +269,19 @@ Details dazu in den folgenden Beschreibungen der einzelnen Intents.
   > Stelle die Heizung im Büro um 2 Grad wärmer
   > Lauter
 
-* **GetNumeric**\
-Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstärke, ...
-Beispiel: `GetNumeric:currentVal=temperature,part=1`\
-\
-Optionen:
-  * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann. Kann auch auf ein anderes Gerät verweisen durch Format `Device:Reading`
-  * __*part*__ Splittet *currentVal* Reading bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
-  * __*map*__ Siehe Beschreibung im *SetNumeric* Intent. Hier wird rückwärts gerechnet um wieder Prozent zu erhalten
-  * __*minVal*__ nur nötig bei genutzter `map` Option
-  * __*maxVal*__ nur nötig bei genutzter `map` Option
-  * __*type*__ Zur Unterscheidung bei mehreren GetNumeric Intents in einem Device.\
-    Zum Beispiel für die Möglichkeit getrennt eingestellter Sollwert und Ist-Temperatur von einem Thermostat abzufragen.\
-    Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`, `Batterie`
+* ##### GetNumeric
+  Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstärke, ...
+  Beispiel: `GetNumeric:currentVal=temperature,part=1`\
+  \
+  Optionen:
+    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann. Siehe Kapitel zur Formatierung von Readings.
+    * __*part*__ Splittet *currentVal* Reading bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
+    * __*map*__ Siehe Beschreibung im *SetNumeric* Intent. Hier wird rückwärts gerechnet um wieder Prozent zu erhalten
+    * __*minVal*__ nur nötig bei genutzter `map` Option
+    * __*maxVal*__ nur nötig bei genutzter `map` Option
+    * __*type*__ Zur Unterscheidung bei mehreren GetNumeric Intents in einem Device.\
+      Zum Beispiel für die Möglichkeit getrennt eingestellter Sollwert und Ist-Temperatur von einem Thermostat abzufragen.\
+      Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`, `Batterie`
  
   Beispielsätze:
   > Wie ist die Temperatur vom Thermometer im Büro?\
@@ -259,29 +289,29 @@ Optionen:
   > Wie hell ist die Deckenlampe?\
   > Wie laut ist das Radio im Wohnzimmer?
   
-* **Status**\
-Intent zur Abfrage von Informationen zu einem Gerät.\ Der Antworttext kann frei gewählt werden, 
-Beispiel: `Status:response=Die Temperatur beträgt [Thermometer:temperature] Grad bei [Thermometer:humidity] Prozent Luftfeuchtigkeit`\
-\
-Optionen:
-  * __*response*__ Text den Snips ausgeben soll. Werte aus FHEM können im Format `[Device:Reading]` eingefügt werden.\
-  Kommas im Text müssen escaped werden (`\,`statt `,`), da normale Kommas beim snipsMapping das Trennzeichen zwischen den verschiedenen Optionen gelten.
+* ##### Status
+  Intent zur Abfrage von Informationen zu einem Gerät.\ Der Antworttext kann frei gewählt werden, 
+  Beispiel: `Status:response=Die Temperatur beträgt [Thermometer:temperature] Grad bei [Thermometer:humidity] Prozent Luftfeuchtigkeit`\
+  \
+  Optionen:
+    * __*response*__ Text den Snips ausgeben soll. Werte aus FHEM können im Format `[Device:Reading]` eingefügt werden.\
+    Kommas im Text müssen escaped werden (`\,`statt `,`), da normale Kommas beim snipsMapping das Trennzeichen zwischen den verschiedenen Optionen gelten.
  
   Beispielsätze:
   > Wie ist der Status vom Thermometer im Büro?\
   > Status Deckenlampe im Wohnzimmer\
   > Status Waschmaschine
   
-* **MediaControls**\
+* ##### MediaControls
   Intent zum Steuern von Mediengeräten\
   Beispiel: `MediaControls:cmdPlay=play,cmdPause=pause,cmdStop=stop`\
   \
   Optionen:
-    * __*cmdPlay*__ Befehl *Play* des Geräts. Kann auch auf ein anderes Gerät verweisen durch Format `Device:cmd`
-    * __*cmdPause*__ Befehl *Pause* des Geräts. Kann auch auf ein anderes Gerät verweisen durch Format `Device:cmd`
-    * __*cmdStop*__ Befehl *Stop* des Geräts. Kann auch auf ein anderes Gerät verweisen durch Format `Device:cmd`
-    * __*cmdFwd*__ Befehl *Skip Forward* des Geräts. Kann auch auf ein anderes Gerät verweisen durch Format `Device:cmd`
-    * __*cmdBack*__ Befehl *Skip Back* des Geräts. Kann auch auf ein anderes Gerät verweisen durch Format `Device:cmd`
+    * __*cmdPlay*__ Befehl *Play* des Geräts. Siehe Kapitel zur Formatierung von CMDs.
+    * __*cmdPause*__ Befehl *Pause* des Geräts. Siehe Kapitel zur Formatierung von CMDs.
+    * __*cmdStop*__ Befehl *Stop* des Geräts. Siehe Kapitel zur Formatierung von CMDs.
+    * __*cmdFwd*__ Befehl *Skip Forward* des Geräts. Siehe Kapitel zur Formatierung von CMDs.
+    * __*cmdBack*__ Befehl *Skip Back* des Geräts. Siehe Kapitel zur Formatierung von CMDs.
 
   *__Hinweis zu Befehlen ohne Nennung des Gerätenamens:__\
   Um Befehle wie z.B. `Pause`, `Nächstes Lied` oder `Zurück` ohne Angabe eines Gerätes verwenden zu können,\
@@ -299,7 +329,7 @@ Optionen:
   > Weiter\
   > Zurück
   
-* **MediaChannels**\
+* ##### MediaChannels
   Intent zum Abspielen von Radio-/Fernsehsendern, Favoriten, Playlists, ...
   
   Anstatt im Attribut snipsMapping eingetragen zu werden,\
@@ -311,8 +341,8 @@ Optionen:
   \
   Danach kann das Attribut `snipsChannels` befüllt werden.\
   Pro Zeile ein Eintrag im Format *Channelbezeichnung:cmd*\
-  *Channelbezeichnung* ist der Name den ihr sprechen wollt, *cmd* der Set-Befehl des Geräts.\
-  Dieser kann mit dem Format `Device:cmd` auch auf ein anderes Gerät verweisen.\
+  *Channelbezeichnung* ist der Name den ihr sprechen wollt.\
+  *cmd* ist der Set-Befehl des Geräts. Siehe Kapitel zur Formatierung von CMDs.
   \
   Beispiel:
   ```

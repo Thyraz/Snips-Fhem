@@ -51,6 +51,22 @@ sub SNIPS_Initialize($) {
     main::LoadModule("MQTT");
 }
 
+# Cmd in main:: ausführen damit User den Prefix nicht vor alle Perl-Aufrufe schreiben muss
+sub SNIPS_execute($$$$) {
+    my ($hash, $cmd, $device, $value) = @_;
+    my $returnVal;
+
+    # Nutervariablen setzen
+    my $DEVICE = $device;
+    my $VALUE = $value;
+
+    # CMD ausführen
+    $returnVal = eval $cmd;
+    Log3($hash->{NAME}, 1, $@) if ($@);
+
+    return $returnVal;
+}
+
 
 package SNIPS;
 
@@ -85,6 +101,7 @@ BEGIN {
         AnalyzePerlCommand
         parseParams
         looks_like_number
+        EvalSpecials
     ))
 };
 
@@ -354,13 +371,16 @@ sub getDevicesByIntentAndType($$$$) {
 sub getDeviceByIntentAndType($$$$) {
     my ($hash, $room, $intent, $type) = @_;
     my $device;
-    my $matchesInRoom, my $matchesOutsideRoom;
 
     # Devices sammeln
     my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type);
 
     # Erstes Device im passenden Raum zurückliefern falls vorhanden, sonst erstes Device außerhalb
-    return (@{$matchesInRoom} > 0) ? shift @{$matchesInRoom} : shift @{$matchesOutsideRoom};
+    $device = (@{$matchesInRoom} > 0) ? shift @{$matchesInRoom} : shift @{$matchesOutsideRoom};
+
+    Log3($hash->{NAME}, 5, "Device selected: $device");
+
+    return $device;
 }
 
 
@@ -393,6 +413,8 @@ sub getActiveDeviceForIntentAndType($$$$) {
     $device = $activeDevice->($hash, $matchesInRoom);
     $device = $activeDevice->($hash, $matchesOutsideRoom) if (!defined($device));
 
+    Log3($hash->{NAME}, 5, "Device selected: $device");
+
     return $device;
 }
 
@@ -419,9 +441,47 @@ sub getDeviceByMediaChannel($$$) {
             $device = $_;
         }
     }
+
     Log3($hash->{NAME}, 5, "Device selected: $device");
 
     return $device;
+}
+
+
+# Mappings in Key/Value Paare aufteilen
+sub splitMappingString($) {
+    my ($mapping) = @_;
+    my @tokens, my $token = '';
+    my $char, my $lastChar = '';
+    my $bracketLevel = 0;
+    my %parsedMapping;
+
+    # String in Kommagetrennte Tokens teilen
+    foreach $char (split(//, $mapping)) {
+        if ($char eq '{' && $lastChar ne '\\') {
+            $bracketLevel += 1;
+            $token .= $char;
+        }
+        elsif ($char eq '}' && $lastChar ne '\\') {
+            $bracketLevel -= 1;
+            $token .= $char;
+        }
+        elsif ($char eq ',' && $lastChar ne '\\' && $bracketLevel == 0) {
+            push(@tokens, $token);
+            $token = '';
+        }
+        else {
+            $token .= $char;
+        }
+
+        $lastChar = $char;
+    }
+    push(@tokens, $token) if (length($token) > 0);
+
+    # Tokens in Keys/Values trennen
+    my %parsedMapping = map {split /=/, $_, 2} @tokens;
+
+    return %parsedMapping;
 }
 
 
@@ -439,7 +499,7 @@ sub getMapping($$$$;$) {
             # Nur Mappings vom gesuchten Typ verwenden
             next unless $_ =~ qr/^$intent/;
             $_ =~ s/$intent://;
-            my %currentMapping = split(/(?<!\\),|=/, $_);
+            my %currentMapping = splitMappingString($_);
 
             # Erstes Mapping vom passenden Intent wählen (unabhängig vom Type), dann ggf. weitersuchen ob noch ein besserer Treffer mit passendem Type kommt
             if (!defined($matchedMapping) || (defined($type) && $matchedMapping->{'type'} ne $type && $currentMapping{'type'} eq $type)) {
@@ -476,18 +536,67 @@ sub getCmd($$$$;$) {
 }
 
 
+# Cmd String im Format 'cmd', 'device:cmd' oder '{<perlcode}' ausführen
+sub runCmd($$$;$) {
+    my ($hash, $device, $cmd, $val) = @_;
+    my $error;
+
+    # Perl Command?
+    if ($cmd =~ m/^\s*{.*}\s*$/) {
+        # CMD ausführen
+        main::SNIPS_execute($hash, $cmd, $device, $val);
+    }
+    # Soll Command auf anderes Device umgelenkt werden?
+    elsif ($cmd =~ m/:/) {
+        $cmd =~ s/:/ /;
+        $cmd = $cmd . ' ' . $val if (defined($val));
+        $error = AnalyzeCommand($hash, "set $cmd");
+    }
+    # Nur normales Fhem Cmd angegeben
+    else {
+        $cmd = "$device $cmd";
+        $cmd = $cmd . ' ' . $val if (defined($val));
+        $error = AnalyzeCommand($hash, "set $cmd");
+    }
+
+    Log3($hash->{NAME}, 1, $_) if (defined($error));
+}
+
+
+# Wert über Format 'reading', 'device:reading' oder '{<perlcode}' lesen
+sub getValue($$$) {
+    my ($hash, $device, $getString) = @_;
+    my $value;
+
+    # Perl Command?
+    if ($getString =~ m/^\s*{.*}\s*$/) {
+        # Nutervariablen setzen
+        #my $DEVICE = $device;
+
+        # Wert lesen
+        #$value = eval $getString;
+        #Log3($hash->{NAME}, 1, $@) if ($@);
+        $value = main::SNIPS_execute($hash, $getString, $device, undef);
+    }
+    # Fhem Command
+    else {
+      # Soll Reading von einem anderen Device gelesen werden?
+      my $readingsDev = ($getString =~ m/:/) ? (split(/:/, $getString))[0] : $device;
+      my $reading = ($getString =~ m/:/) ? (split(/:/, $getString))[1] : $getString;
+
+      $value = ReadingsVal($readingsDev, $reading, 0);
+    }
+
+    return $value;
+}
+
+
 # Zustand eines Gerätes über GetOnOff Mapping abfragen
 sub getOnOffState ($$$) {
     my ($hash, $device, $mapping) = @_;
-    my $value;
-
-    # Soll Reading von einem anderen Device gelesen werden?
-    my $readingsDev = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[0] : $device;
-    my $reading = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[1] : $mapping->{'currentVal'};
     my $valueOn   = (defined($mapping->{'valueOn'}))  ? $mapping->{'valueOn'}  : undef;
     my $valueOff  = (defined($mapping->{'valueOff'})) ? $mapping->{'valueOff'} : undef;
-
-    $value = ReadingsVal($readingsDev, $reading, undef);
+    my $value = getValue($hash, $device, $mapping->{'currentVal'});
 
     # Entscheiden ob $value 0 oder 1 ist
     if (defined($valueOff)) {
@@ -729,11 +838,19 @@ sub textCommand($$) {
 
 # Sprachausgabe / TTS über SNIPS
 sub say($$) {
-    my ($hash, $text) = @_;
+    my ($hash, $cmd) = @_;
     my $sendData, my $json;
+    my $siteId = "default";
+    my $text = $cmd;
+    my($unnamedParams, $namedParams) = parseParams($cmd);
+
+    if (defined($namedParams->{'siteId'}) && defined($namedParams->{'text'})) {
+        $siteId = $namedParams->{'siteId'};
+        $text = $namedParams->{'text'};
+    }
 
     $sendData =  {
-        siteId => "default",
+        siteId => $siteId,
         text => $text,
         lang => "de",
         id => "0",
@@ -848,22 +965,14 @@ sub handleIntentSetOnOff($$) {
 
         # Mapping gefunden?
         if (defined($device) && defined($mapping)) {
-            my $error;
             my $cmdOn  = (defined($mapping->{'cmdOn'}))  ? $mapping->{'cmdOn'}  :  "on";
             my $cmdOff = (defined($mapping->{'cmdOff'})) ? $mapping->{'cmdOff'} : "off";
             my $cmd = ($value eq 'an') ? $cmdOn : $cmdOff;
 
-            # Soll Command auf anderes Device umgelenkt werden?
-            if ($cmd =~ m/:/) {
-                $cmd =~ s/:/ /;
-            } else {
-                $cmd = "$device $cmd";
-            }
-
             $response = "Ok";
-            # Gerät schalten
-            $error = AnalyzeCommand($hash, "set $cmd");
-            Log3($hash->{NAME}, 1, $error) if (defined($error));
+
+            # Cmd ausführen
+            runCmd($hash, $device, $cmd);
         }
     }
     # Antwort senden
@@ -941,9 +1050,6 @@ sub handleIntentSetNumeric($$) {
             elsif ($change =~ m/^(lauter|leiser)$/)  { $type = "Lautstärke"; }
         }
 
-        Log3($hash->{NAME}, 5, "type: $type");
-        Log3($hash->{NAME}, 5, "Device: $device");
-
         # Gerät über Name suchen, oder falls über Lautstärke ohne Device getriggert wurde das ActiveMediaDevice suchen
         if (exists($data->{'Device'})) {
             $device = getDeviceByName($hash, $room, $data->{'Device'});
@@ -952,35 +1058,21 @@ sub handleIntentSetNumeric($$) {
             $response = "Kein Wiedergabegerät aktiv" if (!defined($device));
         }
 
-        Log3($hash->{NAME}, 5, "Device: $device");
-
         if (defined($device)) {
             $mapping = getMapping($hash, $device, "SetNumeric", $type);
 
             # Mapping und Gerät gefunden -> Befehl ausführen
             if (defined($mapping) && defined($mapping->{'cmd'})) {
-                my $error;
                 my $cmd     = $mapping->{'cmd'};
-                my $part = $mapping->{'part'};
+                my $part    = $mapping->{'part'};
                 my $minVal  = (defined($mapping->{'minVal'})) ? $mapping->{'minVal'} : 0; # Snips kann keine negativen Nummern bisher, daher erzwungener minVal
                 my $maxVal  = $mapping->{'maxVal'};
                 my $diff    = (defined($value)) ? $value : ((defined($mapping->{'step'})) ? $mapping->{'step'} : 10);
                 my $up      = (defined($change) && ($change =~ m/^(höher|heller|lauter|wärmer)$/)) ? 1 : 0;
                 my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent") ? 1 : 0;
 
-                # Soll Reading von einem anderen Device gelesen werden?
-                my $readingsDev = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[0] : $device;
-                my $reading = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[1] : $mapping->{'currentVal'};
-
-                # Soll Command auf anderes Device umgelenkt werden?
-                if ($cmd =~ m/:/) {
-                    $cmd =~ s/:/ /;
-                } else {
-                    $cmd = "$device $cmd";
-                }
-
                 # Alten Wert bestimmen
-                my $oldVal  = ReadingsVal($readingsDev, $reading, 0);
+                my $oldVal  = getValue($hash, $device, $mapping->{'currentVal'});
                 if (defined($part)) {
                     my @tokens = split(/ /, $oldVal);
                     $oldVal = $tokens[$part] if (@tokens >= $part);
@@ -991,10 +1083,6 @@ sub handleIntentSetNumeric($$) {
                 # Direkter Stellwert ("Stelle Lampe auf 50")
                 if ($unit ne "Prozent" && defined($value) && !defined($change) && !$forcePercent) {
                     $newVal = $value;
-                    # Begrenzung auf evtl. gesetzte min/max Werte
-                    $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
-                    $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
-                    $response = "Ok";
                 }
                 # Direkter Stellwert als Prozent ("Stelle Lampe auf 50 Prozent", oder "Stelle Lampe auf 50" bei forcePercent)
                 elsif (defined($value) && ((defined($unit) && $unit eq "Prozent") || $forcePercent) && !defined($change) && defined($minVal) && defined($maxVal)) {
@@ -1003,27 +1091,27 @@ sub handleIntentSetNumeric($$) {
                     $newVal =   0 if ($newVal <   0);
                     $newVal = 100 if ($newVal > 100);
                     $newVal = main::round((($newVal * (($maxVal - $minVal) / 100)) + $minVal), 0);
-                    $response = "Ok";
                 }
                 # Stellwert um Wert x ändern ("Mache Lampe um 20 heller" oder "Mache Lampe heller")
                 elsif ((!defined($unit) || $unit ne "Prozent") && defined($change) && !$forcePercent) {
                     $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
-                    $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
-                    $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
-                    $response = "Ok";
                 }
                 # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei forcePercent oder "Mache Lampe heller" bei forcePercent)
                 elsif (($unit eq "Prozent" || $forcePercent) && defined($change)  && defined($minVal) && defined($maxVal)) {
                     my $diffRaw = main::round((($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
                     $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw;
-                    $newVal = $minVal if ($newVal < $minVal);
-                    $newVal = $maxVal if ($newVal > $maxVal);
-                    $response = "Ok";
                 }
 
-                # Stellwert senden
-                $error = AnalyzeCommand($hash, "set $cmd $newVal") if defined($newVal);
-                Log3($hash->{NAME}, 1, $error) if (defined($error));
+                if (defined($newVal)) {
+                    $response = "Ok";
+
+                    # Begrenzung auf evtl. gesetzte min/max Werte
+                    $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
+                    $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
+
+                    # Cmd ausführen
+                    runCmd($hash, $device, $cmd, $newVal);
+                }
             }
         }
     }
@@ -1057,10 +1145,6 @@ sub handleIntentGetNumeric($$) {
 
         # Mapping gefunden
         if (defined($mapping)) {
-          # Soll Reading von einem anderen Device gelesen werden?
-            my $readingsDev = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[0] : $device;
-            my $reading = ($mapping->{'currentVal'} =~ m/:/) ? (split(/:/, $mapping->{'currentVal'}))[1] : $mapping->{'currentVal'};
-
             my $part = $mapping->{'part'};
             my $minVal  = $mapping->{'minVal'};
             my $maxVal  = $mapping->{'maxVal'};
@@ -1068,7 +1152,7 @@ sub handleIntentGetNumeric($$) {
             my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent" && defined($minVal) && defined($maxVal)) ? 1 : 0;
 
             # Zurückzuliefernden Wert bestimmen
-            $value = ReadingsVal($readingsDev, $reading, undef);
+            $value = getValue($hash, $device, $mapping->{'currentVal'});
             if (defined($part)) {
               my @tokens = split(/ /, $value);
               $value = $tokens[$part] if (@tokens >= $part);
@@ -1148,7 +1232,6 @@ sub handleIntentMediaControls($$) {
         $mapping = getMapping($hash, $device, "MediaControls", undef);
 
         if (defined($device) && defined($mapping)) {
-            my $error;
             my $cmd;
 
             if    ($command =~ m/^play$/i)   { $cmd = $mapping->{'cmdPlay'}; }
@@ -1158,17 +1241,10 @@ sub handleIntentMediaControls($$) {
             elsif ($command =~ m/^zurück$/i) { $cmd = $mapping->{'cmdBack'}; }
 
             if (defined($cmd)) {
-                # Soll Command auf anderes Device umgelenkt werden?
-                if ($cmd =~ m/:/) {
-                    $cmd =~ s/:/ /;
-                } else {
-                    $cmd = "$device $cmd";
-                }
-
                 $response = "Ok";
-                # Gerät schalten
-                $error = AnalyzeCommand($hash, "set $cmd");
-                Log3($hash->{NAME}, 1, $error) if (defined($error));
+
+                # Cmd ausführen
+                runCmd($hash, $device, $cmd);
             }
         }
     }
@@ -1201,19 +1277,10 @@ sub handleIntentMediaChannels($$) {
         $cmd = getCmd($hash, $device, "snipsChannels", $channel, undef);
 
         if (defined($device) && defined($cmd)) {
-            my $error;
-
-            # Soll Command auf anderes Device umgelenkt werden?
-            if ($cmd =~ m/:/) {
-                $cmd =~ s/:/ /;
-            } else {
-                $cmd = "$device $cmd";
-            }
-
             $response = "Ok";
-            # Gerät schalten
-            $error = AnalyzeCommand($hash, "set $cmd");
-            Log3($hash->{NAME}, 1, $error) if (defined($error));
+
+            # Cmd ausführen
+            runCmd($hash, $device, $cmd);
         }
     }
     # Antwort senden
