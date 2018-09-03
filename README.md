@@ -13,6 +13,19 @@ https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-p
 [Readings](#readings--events)\
 [Attribute](#attribute)\
 [Geräte in FHEM für Snips sichtbar machen](#geräte-in-fhem-für-snips-sichtbar-machen)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Der Raum Snips](#raum-snips)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Attribut snipsName](#attribut-snipsname)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Attribut snipsRoom](#attribut-snipsroom)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Intents über snipsMapping zuordnen](#intents-%C3%BCber-snipsmapping-zuordnen)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Formatierung von CMDs und Readings innerhalb eines snipsMappings](#formatierung-von-cmds-und-readings-innerhalb-eines-snipsmappings)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Standard-Intents](#standard-intents)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[SetOnOff](#setonoff)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[GetOnOff](#getonoff)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[SetNumeric](#setnumeric)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[GetNumeric](#getnumeric)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Status](#status)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[MediaControls](#mediacontrols)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[MediaChannels](#mediachannels)\
 [Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren](#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren)\
 [Anhang 1: Snips Installation](#snips-installation)\
 [Anhang 2: Erweiterungen für Snips](#erweiterungen-für-snips)
@@ -176,7 +189,7 @@ Diese können in der Regel auf 3 Arten angegeben werden:
   `cmd=Otherdecice:on` bzw. `currentReading=Otherdevice:temperature`
 * Perl-Code um ein Kommando auszuführen, oder einen Wert zu bestimmen.\
   Dies ermöglicht komplexere Abfragen oder das freie Zusammensetzen von Befehle.\
-  Der Code muss in geschweiften Klammern angegeben werden:\ 
+  Der Code muss in geschweiften Klammern angegeben werden: \
   `{currentVal={ReadingsVal($DEVICE,"state",0)}`\
   oder\
   `cmd={fhem("set $DEVICE dim $VALUE")}`\
@@ -257,18 +270,18 @@ Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
   > Lauter
 
 * ##### GetNumeric
-Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstärke, ...
-Beispiel: `GetNumeric:currentVal=temperature,part=1`\
-\
-Optionen:
-  * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann. Siehe Kapitel zur Formatierung von Readings.
-  * __*part*__ Splittet *currentVal* Reading bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
-  * __*map*__ Siehe Beschreibung im *SetNumeric* Intent. Hier wird rückwärts gerechnet um wieder Prozent zu erhalten
-  * __*minVal*__ nur nötig bei genutzter `map` Option
-  * __*maxVal*__ nur nötig bei genutzter `map` Option
-  * __*type*__ Zur Unterscheidung bei mehreren GetNumeric Intents in einem Device.\
-    Zum Beispiel für die Möglichkeit getrennt eingestellter Sollwert und Ist-Temperatur von einem Thermostat abzufragen.\
-    Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`, `Batterie`
+  Intent zur Abfrage von numerischen Readings wie Temperatur, Helligkeit, Lautstärke, ...
+  Beispiel: `GetNumeric:currentVal=temperature,part=1`\
+  \
+  Optionen:
+    * __*currentVal*__ Reading aus dem der aktuelle Wert ausgelesen werden kann. Siehe Kapitel zur Formatierung von Readings.
+    * __*part*__ Splittet *currentVal* Reading bei Leerzeichen. z.B. mit `part=1` kann so der gewünschte Wert extrahiert werden
+    * __*map*__ Siehe Beschreibung im *SetNumeric* Intent. Hier wird rückwärts gerechnet um wieder Prozent zu erhalten
+    * __*minVal*__ nur nötig bei genutzter `map` Option
+    * __*maxVal*__ nur nötig bei genutzter `map` Option
+    * __*type*__ Zur Unterscheidung bei mehreren GetNumeric Intents in einem Device.\
+      Zum Beispiel für die Möglichkeit getrennt eingestellter Sollwert und Ist-Temperatur von einem Thermostat abzufragen.\
+      Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`, `Batterie`
  
   Beispielsätze:
   > Wie ist die Temperatur vom Thermometer im Büro?\
@@ -277,12 +290,12 @@ Optionen:
   > Wie laut ist das Radio im Wohnzimmer?
   
 * ##### Status
-Intent zur Abfrage von Informationen zu einem Gerät.\ Der Antworttext kann frei gewählt werden, 
-Beispiel: `Status:response=Die Temperatur beträgt [Thermometer:temperature] Grad bei [Thermometer:humidity] Prozent Luftfeuchtigkeit`\
-\
-Optionen:
-  * __*response*__ Text den Snips ausgeben soll. Werte aus FHEM können im Format `[Device:Reading]` eingefügt werden.\
-  Kommas im Text müssen escaped werden (`\,`statt `,`), da normale Kommas beim snipsMapping das Trennzeichen zwischen den verschiedenen Optionen gelten.
+  Intent zur Abfrage von Informationen zu einem Gerät.\ Der Antworttext kann frei gewählt werden, 
+  Beispiel: `Status:response=Die Temperatur beträgt [Thermometer:temperature] Grad bei [Thermometer:humidity] Prozent Luftfeuchtigkeit`\
+  \
+  Optionen:
+    * __*response*__ Text den Snips ausgeben soll. Werte aus FHEM können im Format `[Device:Reading]` eingefügt werden.\
+    Kommas im Text müssen escaped werden (`\,`statt `,`), da normale Kommas beim snipsMapping das Trennzeichen zwischen den verschiedenen Optionen gelten.
  
   Beispielsätze:
   > Wie ist der Status vom Thermometer im Büro?\
