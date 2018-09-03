@@ -173,7 +173,7 @@ Liefert das Device zusätzlich zu der benötigten Info noch eine Einheit wie z.B
 kann die Zahl über die Option *part=0* extrahiert werden.\
 Details dazu in den folgenden Beschreibungen der einzelnen Intents.
 
-* **SetOnOff**\
+* #### SetOnOff
   Intent zum Ein-/Ausschalten, Öffnen/Schließen, Starten/Stoppen, ...\
   Beispiel: `SetOnOff:cmdOn=on,cmdOff=off`\
   \
