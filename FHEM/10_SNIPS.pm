@@ -782,6 +782,8 @@ sub onmessage($$$) {
             SNIPS::handleIntentMediaControls($hash, $data);
         } elsif ($intent eq 'MediaChannels') {
             SNIPS::handleIntentMediaChannels($hash, $data);
+        } elsif ($intent eq 'SetColor') {
+              SNIPS::handleIntentSetColor($hash, $data);
         } else {
             SNIPS::handleCustomIntent($hash, $intent, $data);
         }
@@ -1129,8 +1131,8 @@ sub handleIntentGetNumeric($$) {
 
     Log3($hash->{NAME}, 5, "handleIntentGetNumeric called");
 
-    # Mindestens Type muss existieren
-    if (exists($data->{'Type'})) {
+    # Mindestens Type oder Device muss existieren
+    if (exists($data->{'Type'}) || exists($data->{'Device'})) {
         $type = $data->{'Type'};
         $room = roomName($hash, $data);
 
@@ -1164,15 +1166,20 @@ sub handleIntentGetNumeric($$) {
 
             # Antwort falls mappingType matched
             if    ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
-            elsif ($mappingType eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value Grad."; }
-            elsif ($mappingType eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value Prozent."; }
+            elsif ($mappingType eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . (main::looks_like_number($value) ? " Grad" : ""); }
+            elsif ($mappingType eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . (main::looks_like_number($value) ? " Prozent" : ""); }
             elsif ($mappingType eq "Batterie") { $response = "Der Batteriestand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . (main::looks_like_number($value) ?  " beträgt $value Prozent" : " ist $value"); }
+            elsif ($mappingType eq "Wasserstand") { $response = "Der Wasserstand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value"); }
 
             # Andernfalls Antwort falls type aus Intent matched
             elsif ($type =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
-            elsif ($type eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value Grad."; }
-            elsif ($type eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value Prozent."; }
+            elsif ($type eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . (main::looks_like_number($value) ? " Grad" : ""); }
+            elsif ($type eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . (main::looks_like_number($value) ? " Prozent" : ""); }
             elsif ($type eq "Batterie") { $response = "Der Batteriestand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . (main::looks_like_number($value) ?  " beträgt $value Prozent" : " ist $value"); }
+            elsif ($type eq "Wasserstand") { $response = "Der Wasserstand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value"); }
+
+            # Standardantwort falls der Type überhaupt nicht bestimmt werden kann
+            else { $response = "Der Wert von " . { $response = $data->{'Device'}} . " beträgt $value."; }
         }
     }
     # Antwort senden
@@ -1196,10 +1203,15 @@ sub handleIntentStatus($$) {
         $mapping = getMapping($hash, $device, "Status", undef);
 
         if (defined($mapping)) {
-            # Werte aus Readings nach dem Schema [Device:Reading] im String ersetzen
-            $response = ReplaceReadingsVal($hash, $mapping->{'response'});
-            # Escapte Kommas wieder durch normale ersetzen
-            $response =~ s/\\,/,/;
+            # Perl-Code oder normaler Text?
+            if ( =~ m/^\s*{.*}\s*$/) {
+                $response = getValue($hash, $device, $mapping->{'response'});
+            } else {
+                # Werte aus Readings nach dem Schema [Device:Reading] im String ersetzen
+                $response = ReplaceReadingsVal($hash, $mapping->{'response'});
+                # Escapte Kommas wieder durch normale ersetzen
+                $response =~ s/\\,/,/;
+            }
         }
     }
     # Antwort senden
@@ -1275,6 +1287,36 @@ sub handleIntentMediaChannels($$) {
         }
 
         $cmd = getCmd($hash, $device, "snipsChannels", $channel, undef);
+
+        if (defined($device) && defined($cmd)) {
+            $response = "Ok";
+
+            # Cmd ausführen
+            runCmd($hash, $device, $cmd);
+        }
+    }
+    # Antwort senden
+    respond ($hash, $data->{'requestType'}, $data->{sessionId}, $response);
+}
+
+
+# Eingehende "SetColor" Intents bearbeiten
+sub handleIntentSetColor($$) {
+    my ($hash, $data) = @_;
+    my $color, my $device, my $room;
+    my $cmd;
+    my $response = errorResponse($hash);
+
+    Log3($hash->{NAME}, 5, "handleIntentSetColor called");
+
+    # Mindestens Device und Color muss übergeben worden sein
+    if (exists($data->{'Color'}) && exists($data->{'Device'})) {
+        $room = roomName($hash, $data);
+        $color = $data->{'Color'};
+
+        # Passendes Gerät & Cmd suchen
+        $device = getDeviceByName($hash, $room, $data->{'Device'});
+        $cmd = getCmd($hash, $device, "snipsColors", $color, undef);
 
         if (defined($device) && defined($cmd)) {
             $response = "Ok";
