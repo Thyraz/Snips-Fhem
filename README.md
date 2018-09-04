@@ -390,8 +390,8 @@ Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
   ```
   
   Beispielsätze:
-  > Stelle Deckenlampe im Wohnzimmer auf warmweiß
-  > Färbe Stehlampe blau
+  > Stelle Deckenlampe im Wohnzimmer auf warmweiß\
+  > Färbe Stehlampe blau\
   > Lichterkette auf grün
 
 ## Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren
