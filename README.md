@@ -282,7 +282,7 @@ Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
     * __*maxVal*__ nur nötig bei genutzter `map` Option
     * __*type*__ Zur Unterscheidung bei mehreren GetNumeric Intents in einem Device.\
       Zum Beispiel für die Möglichkeit getrennt eingestellter Sollwert und Ist-Temperatur von einem Thermostat abzufragen.\
-      Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`, `Batterie`
+      Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`, `Batterie`, `Wasserstand`
  
   Beispielsätze:
   > Wie ist die Temperatur vom Thermometer im Büro?\
@@ -293,10 +293,14 @@ Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
 * ##### Status
   Intent zur Abfrage von Informationen zu einem Gerät.\ Der Antworttext kann frei gewählt werden, 
   Beispiel: `Status:response=Die Temperatur beträgt [Thermometer:temperature] Grad bei [Thermometer:humidity] Prozent Luftfeuchtigkeit`\
+  oder
+  `Status:response={my $value=ReadingsVal("device","reading",""); return "Der Wert beträgt $value";}\
   \
   Optionen:
     * __*response*__ Text den Snips ausgeben soll. Werte aus FHEM können im Format `[Device:Reading]` eingefügt werden.\
-    Kommas im Text müssen escaped werden (`\,`statt `,`), da normale Kommas beim snipsMapping das Trennzeichen zwischen den verschiedenen Optionen gelten.
+    Kommas im Text müssen escaped werden (`\,`statt `,`), da normale Kommas beim snipsMapping das Trennzeichen zwischen den verschiedenen Optionen gelten.\
+    Alternativ kann statt dem Text auch Perl-Code in geschweiften Klammern angegeben werden, der die Antwort zurückliefert.\
+    Ein Mix aus beiden Varianten (Text + Perl) wird nicht unterstützt.
  
   Beispielsätze:
   > Wie ist der Status vom Thermometer im Büro?\
