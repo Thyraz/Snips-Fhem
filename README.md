@@ -26,6 +26,7 @@ https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-p
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Status](#status)\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[MediaControls](#mediacontrols)\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[MediaChannels](#mediachannels)\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[SetColor](#setcolor)\
 [Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren](#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren)\
 [Anhang 1: Snips Installation](#snips-installation)\
 [Anhang 2: Erweiterungen für Snips](#erweiterungen-für-snips)
@@ -340,7 +341,7 @@ Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
   `attr <deviceName> userattr snipsChannels:textField-long`\
   \
   Danach kann das Attribut `snipsChannels` befüllt werden.\
-  Pro Zeile ein Eintrag im Format *Channelbezeichnung:cmd*\
+  Pro Zeile ein Eintrag im Format *Channelbezeichnung=cmd*\
   *Channelbezeichnung* ist der Name den ihr sprechen wollt.\
   *cmd* ist der Set-Befehl des Geräts. Siehe Kapitel zur Formatierung von CMDs.
   \
@@ -363,6 +364,35 @@ Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
   > Spiele SWR1\
   > Schalte um auf BigFM\
   > Sender vom Radio auf Das Ding wechseln
+
+* ##### SetColor
+  Intent zum Steuern von Lichtfarben, ...
+  
+  Anstatt im Attribut snipsMapping eingetragen zu werden,\
+  wird Der Intent über ein eigenes Attribut `snipsColors` im jeweiligen Gerät konfiguriert.\
+  Grund dafür ist die mehrzeilige Konfiguration des Intents.\
+  \
+  Um dem Device das neue Attribut hinzuzufügen, muss das Attribut _userattr_ befüllt werden:\
+  `attr <deviceName> userattr snipsColors:textField-long`\
+  \
+  Danach kann das Attribut `snipsColors` befüllt werden.\
+  Pro Zeile ein Eintrag im Format *Farbbezeichnung=cmd*\
+  *Farbbezeichnung* ist der Name den ihr sprechen wollt.\
+  *cmd* ist der Set-Befehl des Geräts. Siehe Kapitel zur Formatierung von CMDs.
+  \
+  Beispiel:
+  ```
+  rot=rgb FF0000
+  grün=rgb 00FF00
+  blau=rgb 0000FF
+  weiß=ct 3000
+  warmweiß=ct 2700
+  ```
+  
+  Beispielsätze:
+  > Stelle Deckenlampe im Wohnzimmer auf warmweiß\
+  > Färbe Stehlampe blau\
+  > Lichterkette auf grün
 
 ## Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren
 
