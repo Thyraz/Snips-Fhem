@@ -1195,6 +1195,7 @@ sub handleIntentGetNumeric($$) {
             my $maxVal  = $mapping->{'maxVal'};
             my $mappingType = $mapping->{'type'};
             my $forcePercent = (defined($mapping->{'map'}) && lc($mapping->{'map'}) eq "percent" && defined($minVal) && defined($maxVal)) ? 1 : 0;
+            my $isNumber;
 
             # Zurückzuliefernden Wert bestimmen
             $value = getValue($hash, $device, $mapping->{'currentVal'});
@@ -1202,23 +1203,24 @@ sub handleIntentGetNumeric($$) {
               my @tokens = split(/ /, $value);
               $value = $tokens[$part] if (@tokens >= $part);
             }
-            $value =  main::round((($value * (($maxVal - $minVal) / 100)) + $minVal), 0) if ($forcePercent);
+            $value = main::round((($value * (($maxVal - $minVal) / 100)) + $minVal), 0) if ($forcePercent);
+            $isNumber = main::looks_like_number($value);
 
             # Punkt durch Komma ersetzen in Dezimalzahlen
             $value =~ s/\./\,/g;
 
             # Antwort falls mappingType matched
             if    ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
-            elsif ($mappingType eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . (main::looks_like_number($value) ? " Grad" : ""); }
-            elsif ($mappingType eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . (main::looks_like_number($value) ? " Prozent" : ""); }
-            elsif ($mappingType eq "Batterie") { $response = "Der Batteriestand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . (main::looks_like_number($value) ?  " beträgt $value Prozent" : " ist $value"); }
+            elsif ($mappingType eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . ($isNumber ? " Grad" : ""); }
+            elsif ($mappingType eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . ($isNumber ? " Prozent" : ""); }
+            elsif ($mappingType eq "Batterie") { $response = "Der Batteriestand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . ($isNumber ?  " beträgt $value Prozent" : " ist $value"); }
             elsif ($mappingType eq "Wasserstand") { $response = "Der Wasserstand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value"; }
 
             # Andernfalls Antwort falls type aus Intent matched
             elsif ($type =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
-            elsif ($type eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . (main::looks_like_number($value) ? " Grad" : ""); }
-            elsif ($type eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . (main::looks_like_number($value) ? " Prozent" : ""); }
-            elsif ($type eq "Batterie") { $response = "Der Batteriestand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . (main::looks_like_number($value) ?  " beträgt $value Prozent" : " ist $value"); }
+            elsif ($type eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . ($isNumber ? " Grad" : ""); }
+            elsif ($type eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . ($isNumber ? " Prozent" : ""); }
+            elsif ($type eq "Batterie") { $response = "Der Batteriestand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . ($isNumber ?  " beträgt $value Prozent" : " ist $value"); }
             elsif ($type eq "Wasserstand") { $response = "Der Wasserstand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value"; }
 
             # Standardantwort falls der Type überhaupt nicht bestimmt werden kann
