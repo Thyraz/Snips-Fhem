@@ -292,13 +292,13 @@ Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
   
 * ##### Status
   Intent zur Abfrage von Informationen zu einem Gerät.\ Der Antworttext kann frei gewählt werden, 
-  Beispiel: `Status:response=Die Temperatur beträgt [Thermometer:temperature] Grad bei [Thermometer:humidity] Prozent Luftfeuchtigkeit`\
+  Beispiel: `Status:response=Temperatur ist [Thermo:temp] Grad bei [Thermo:hum] Prozent Luftfeuchtigkeit`\
   oder\
   `Status:response={my $value=ReadingsVal("device","reading",""); return "Der Wert beträgt $value";}`\
   \
   Optionen:
     * __*response*__ Text den Snips ausgeben soll. \
-    \Werte aus FHEM können im Format `[Device:Reading]` eingefügt werden. \
+    Werte aus FHEM können im Format `[Device:Reading]` eingefügt werden. \
     Kommas im Text müssen escaped werden (`\,`statt `,`), \
     da normale Kommas beim snipsMapping als das Trennzeichen zwischen den verschiedenen Optionen gelten.\
     Alternativ kann statt dem Text auch Perl-Code in geschweiften Klammern angegeben werden, \
