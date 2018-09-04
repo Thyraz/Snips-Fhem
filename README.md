@@ -297,9 +297,12 @@ Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
   `Status:response={my $value=ReadingsVal("device","reading",""); return "Der Wert beträgt $value";}`\
   \
   Optionen:
-    * __*response*__ Text den Snips ausgeben soll. Werte aus FHEM können im Format `[Device:Reading]` eingefügt werden.\
-    Kommas im Text müssen escaped werden (`\,`statt `,`), da normale Kommas beim snipsMapping das Trennzeichen zwischen den verschiedenen Optionen gelten.\
-    Alternativ kann statt dem Text auch Perl-Code in geschweiften Klammern angegeben werden, der die Antwort zurückliefert.\
+    * __*response*__ Text den Snips ausgeben soll. \
+    \Werte aus FHEM können im Format `[Device:Reading]` eingefügt werden. \
+    Kommas im Text müssen escaped werden (`\,`statt `,`), \
+    da normale Kommas beim snipsMapping als das Trennzeichen zwischen den verschiedenen Optionen gelten.\
+    Alternativ kann statt dem Text auch Perl-Code in geschweiften Klammern angegeben werden, \
+    der die Antwort zurückliefert.\
     Ein Mix aus beiden Varianten (Text + Perl) wird nicht unterstützt.
  
   Beispielsätze:
