@@ -373,7 +373,7 @@ Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
   Grund dafür ist die mehrzeilige Konfiguration des Intents.\
   \
   Um dem Device das neue Attribut hinzuzufügen, muss das Attribut _userattr_ befüllt werden:\
-  `attr <deviceName> userattr snipsSolors:textField-long`\
+  `attr <deviceName> userattr snipsColors:textField-long`\
   \
   Danach kann das Attribut `snipsColors` befüllt werden.\
   Pro Zeile ein Eintrag im Format *Farbbezeichnung=cmd*\
