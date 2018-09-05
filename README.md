@@ -107,7 +107,7 @@ define Snips SNIPS SnipsMQTT Wohnzimmer
 * **say**\
   Sprachausgabe über TTS.\
   Snips gibt den übergeben Text per Sprache aus\
-  Beispiel: `set <snipsDevice> say Dies ist ein Test`
+  Beispiel: `set <snipsDevice> say siteId="default" text="Dies ist ein Test"`
   
 * **textCommand**\
   Snips per Text steuern.\
