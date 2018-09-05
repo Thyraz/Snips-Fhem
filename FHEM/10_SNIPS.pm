@@ -20,7 +20,8 @@ my %sets = (
     "say" => "",
     "play" => "",
     "updateModel" => "",
-    "textCommand" => ""
+    "textCommand" => "",
+    "volume" => ""
 );
 
 # MQTT Topics die das Modul automatisch abonniert
@@ -151,9 +152,6 @@ sub Set($$$@) {
     # Say Cmd
     if ($command eq "say") {
         my $text = join (" ", @values);
-
-        # TODO: Parameter über parseParams und dann say function noch einen Parameter siteId geben
-
         SNIPS::say($hash, $text);
     }
     # TextCommand Cmd
@@ -164,6 +162,11 @@ sub Set($$$@) {
     # Update Model Cmd
     elsif ($command eq "updateModel") {
         SNIPS::updateModel($hash);
+    }
+    # Volume Cmd
+    elsif ($command eq "volume") {
+        my $params = join (" ", @values);
+        SNIPS::setVolume($hash, $params);
     }
 }
 
@@ -899,6 +902,30 @@ sub say($$) {
 
     $json = toJSON($sendData);
     MQTT::send_publish($hash->{IODev}, topic => 'hermes/tts/say', message => $json, qos => 0, retain => "0");
+}
+
+
+# Sprachausgabe / TTS über SNIPS
+sub setVolume($$) {
+    my ($hash, $params) = @_;
+    my $sendData, my $json;
+    my $siteId, my $volume;
+    my($unnamedParams, $namedParams) = parseParams($params);
+
+    Log3($hash->{NAME}, 5, "Params: $params");
+
+    if (defined($namedParams->{'siteId'}) && defined($namedParams->{'volume'})) {
+        $siteId = $namedParams->{'siteId'};
+        $volume = $namedParams->{'volume'};
+
+        $sendData =  {
+            siteId => $siteId,
+            volume => $volume
+        };
+
+        $json = toJSON($sendData);
+        MQTT::send_publish($hash->{IODev}, topic => 'hermes/sound/setvolume', message => $json, qos => 0, retain => "0");
+    }
 }
 
 
