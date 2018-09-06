@@ -246,7 +246,7 @@ Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
     * __*map*__ Bisher nur ein Wert für diese Option möglich: *percent*
     * __*type*__ Zur Unterscheidung bei mehreren GetNumeric Intents in einem Device.\
     Zum Beispiel für die Möglichkeit getrennt eingestellter Sollwert und Ist-Temperatur von einem Thermostat abzufragen.\
-    Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`, `Batterie`
+    Mögliche Werte: `Helligkeit`, `Temperatur`, `Sollwert`, `Lautstärke`, `Luftfeuchtigkeit`, `Batterie`, `Wasserstand`
   
   *__Erläuterung zu map=percent:__\
   Ist die Option gesetzt, werden alle numerischen Stellwerte als Prozentangaben zwischen minVal und maxVal verstanden.\
