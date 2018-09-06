@@ -123,6 +123,12 @@ define Snips SNIPS SnipsMQTT Wohnzimmer
   Kopiert ihr also einen neuen Assistenten (oder eine neue Version des aktuellen Assistenten) auf den Rechner,\
   müsst ihr updateModell erneut ausführen.\
   Auch nach dem Hinzufügen neuer snipsNames, snipsRoom oder MediaChannels muss updateModell erneut ausgeführt werden.
+  
+* **volume**\
+  Lautstärke der Sprachausgabe regeln.\
+  Hierfür muss das Python Addon *snips-volume* installiert werden.\
+  Siehe Abschnitt *__Erweiterungen für Snips__* \
+  Beispiel: `set <snipsDevice> volume siteId="default" volume="50"`
 
 ## Readings / Events
 
@@ -550,6 +556,42 @@ Danach sollte Snips über *Hey Snips* geweckt werden können.
 
 
 ## Erweiterungen für Snips
+
+### Lautstärke von Snips aus FHEM heraus steuern
+Snips unterstützt bisher keine Lautstärkeregelung der Sprachausgabe .\
+Ich habe daher einen Python Service geschrieben, welcher auf bestimmte MQTT Nachrichten vom FHEM Modul lauscht, \
+und dann über Alsa die Systemlautstärke ändert. \
+Der Service sollte also auf jeder Snips-Installation die ihr betreibt installiert werden (Main-Device und Satelliten).
+
+#### Benötigte Module installieren
+```
+sudo apt-get install libasound2-dev
+sudo pip3 install pyalsaaudio
+sudo pip3 install paho-mqtt
+sudo pip3 install toml
+```
+
+### Python Service installieren
+```
+sudo apt-get install git
+cd /opt
+sudo git clone https://github.com/Thyraz/snips-volume.git
+cd snips-volume
+```
+testweise mit `sudo ./snips-volume.py` starten.\
+Wenn keine Fehler kommen und das Programm bis *MQTT connected* läuft kann mit __STRG+C__ abgebrochen werden.\
+Kopieren des Systemd services: 
+```
+sudo cp snips-volume.service /etc/systemd/system/
+sudo systemctl daemon-reload
+```
+Dann den Autostart aktivieren und den Service gleich starten:
+```
+sudo systemctl enable snips-tts-polly
+sudo systemctl stop snips-tts
+sudo systemctl start snips-tts-polly
+```
+Nun solltet ihr über `set <snips> volume siteId="default" volume="50"` im FHEM-Modul die Lautstärke regeln können.
 
 ### Bessere Sprachausgabe mit Amazon Polly
 #### AWS Konto erstellen 
