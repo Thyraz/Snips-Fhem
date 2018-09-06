@@ -30,6 +30,8 @@ https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-p
 [Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren](#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren)\
 [Anhang 1: Snips Installation](#snips-installation)\
 [Anhang 2: Erweiterungen für Snips](#erweiterungen-für-snips)
+&nbsp;&nbsp;&nbsp;&nbsp;[Lautstärke von Snips aus FHEM heraus steuern](#lautst%C3%A4rke-von-snips-aus-fhem-heraus-steuern)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Bessere Sprachausgabe mit Amazon Polly](#bessere-sprachausgabe-mit-amazon-polly)\
 
 ## Über Snips
 Snips ist ein Sprachassistent ähnlich Siri oder Alexa.\
