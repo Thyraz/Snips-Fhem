@@ -78,7 +78,7 @@ use GPUtils qw(:all);
 use JSON;
 use Net::MQTT::Constants;
 use Encode;
-# use Data::Dumper 'Dumper';
+use Data::Dumper 'Dumper';
 
 BEGIN {
     MQTT->import(qw(:all));
@@ -734,32 +734,29 @@ sub onmessage($$$) {
         my $command = $data->{'input'};
 
         # Geräte- und Raumbezeichnungen im Kommando gegen die Defaultbezeichnung aus dem Snips-Slot tauschen, damit NLU uns versteht
-        foreach (@devices) {
-            if ($command =~ qr/$_/i) {
-                $device = lc($_);
-                $command =~ s/$_/'standardgerät'/i;
-                last;
-            }
-        }
-        foreach (@rooms) {
-            if ($command =~ qr/$_/i) {
-                $room = lc($_);
-                $command =~ s/$_/'standardraum'/i;
-                last;
-            }
-        }
-        foreach (@channels) {
-            if ($command =~ qr/$_/i) {
-                $channel = lc($_);
-                $command =~ s/$_/'standardsender'/i;
-                last;
-            }
-        }
-        foreach (@colors) {
-            if ($command =~ qr/$_/i) {
-                $color = lc($_);
-                $command =~ s/$_/'standardfarbe'/i;
-                last;
+        # Alle Werte in ein Array und der Länge nach sortieren, damit z.B. "Jazz Radio" nicht fehlerhafterweise als "Radio" erkannt wird
+        my @keys = (@devices, @rooms, @channels, @colors);
+        my @sortedKeys = sort { length($b) <=> length($a) } @keys;
+
+        foreach my $key (@sortedKeys) {
+            if ($command =~ qr/$key/i) {
+                # Wert kam ursprünglich aus @devices
+                if (grep( /^$key$/, @devices)) {
+                    $device = lc($key);
+                    $command =~ s/$key/standardgerät/i;
+                }
+                elsif ( grep( /^$key$/, @rooms ) ) {
+                    $room = lc($key);
+                    $command =~ s/$key/standardraum/i;
+                }
+                elsif ( grep( /^$key$/, @channels ) ) {
+                    $channel = lc($key);
+                    $command =~ s/$key/standardsender/i;
+                }
+                elsif ( grep( /^$key$/, @colors ) ) {
+                    $color = lc($key);
+                    $command =~ s/$key/standardfarbe/i;
+                }
             }
         }
 
