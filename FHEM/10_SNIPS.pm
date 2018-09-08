@@ -78,7 +78,7 @@ use GPUtils qw(:all);
 use JSON;
 use Net::MQTT::Constants;
 use Encode;
-use Data::Dumper 'Dumper';
+# use Data::Dumper 'Dumper';
 
 BEGIN {
     MQTT->import(qw(:all));
