@@ -668,7 +668,10 @@ sub parseJSON($$) {
         # Key -> Value Paare aus dem Slot Array ziehen
         foreach my $slot (@slots) {
             my $slotName = $slot->{'slotName'};
-            my $slotValue = $slot->{'value'}{'value'};
+            my $slotValue;
+
+            $slotValue = $slot->{'value'}{'value'} if (exists($slot->{'value'}{'value'}));
+            $slotValue = $slot->{'value'} if (exists($slot->{'entity'}) && $slot->{'entity'} eq "snips/duration");
 
             $data->{$slotName} = $slotValue;
         }
@@ -985,6 +988,13 @@ sub handleCustomIntent($$$) {
 
         $intent = $_;
         Log3($hash->{NAME}, 5, "snipsIntent selected: $_");
+    }
+
+    # Gerät setzen falls Slot Device vorhanden
+    if (exists($data->{'Device'})) {
+      my $room = roomName($hash, $data);
+      my $device = getDeviceByName($hash, $room, $data->{'Device'});
+      $data->{'Device'} = $device;
     }
 
     # Custom Intent Definition Parsen
