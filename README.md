@@ -579,6 +579,7 @@ sudo apt-get install git
 cd /opt
 sudo git clone https://github.com/Thyraz/snips-volume.git
 cd snips-volume
+sudo chmod +x snips-volume.py
 ```
 testweise mit `sudo python3 /opt/snips-volume/snips-volume.py` starten.\
 Wenn keine Fehler kommen und das Programm bis *MQTT connected* läuft kann mit __STRG+C__ abgebrochen werden.\
