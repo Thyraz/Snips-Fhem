@@ -1003,7 +1003,7 @@ sub updateModel($) {
       $colorData->{'de.fhem.Color'} = \@colors;
       @ccolorOperation = ('add', $colorData);
 
-      $shortcutData->{'de.fhem.Shortcut'} = \@shortcuts;
+      $shortcutData->{'de.fhem.Shortcuts'} = \@shortcuts;
       @shortcutOperation = ('add', $shortcutData);
 
       push(@operations, \@deviceOperation) if @devices > 0;
