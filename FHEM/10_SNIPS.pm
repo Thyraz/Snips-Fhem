@@ -46,7 +46,7 @@ sub SNIPS_Initialize($) {
     $hash->{UndefFn} = "SNIPS::Undefine";
     $hash->{SetFn} = "SNIPS::Set";
     $hash->{AttrFn} = "SNIPS::Attr";
-    $hash->{AttrList} = "IODev defaultRoom snipsIntents:textField-long errorResponse " . $main::readingFnAttributes;
+    $hash->{AttrList} = "IODev defaultRoom snipsIntents:textField-long shortcuts:textField-long response:textField-long " . $main::readingFnAttributes;
     $hash->{OnMessageFn} = "SNIPS::onmessage";
 
     main::LoadModule("MQTT");
@@ -54,7 +54,7 @@ sub SNIPS_Initialize($) {
 
 # Cmd in main:: ausführen damit User den Prefix nicht vor alle Perl-Aufrufe schreiben muss
 sub SNIPS_execute($$$$) {
-    my ($hash, $cmd, $device, $value) = @_;
+    my ($hash, $device, $cmd, $value) = @_;
     my $returnVal;
 
     # Nutervariablen setzen
@@ -99,6 +99,7 @@ BEGIN {
         round
         toJSON
         AnalyzeCommand
+        AnalyzeCommandChain
         AnalyzePerlCommand
         parseParams
         looks_like_number
@@ -309,6 +310,25 @@ sub allSnipsColors() {
 
     # Längere Werte zuerst, damit bei Ersetzungen z.B. nicht 'S.W.R.' gefunden wird bevor der eigentliche Treffer 'S.W.R.3' versucht wurde
     @sorted = sort { length($b) <=> length($a) } @colors;
+
+    return @sorted
+}
+
+
+# Alle Shortcuts sammeln
+sub allSnipsShortcuts($) {
+    my ($hash) = @_;
+    my @shortcuts, my @sorted;
+
+    my @rows = split(/\n/, AttrVal($hash->{NAME},"shortcuts",undef));
+    foreach (@rows) {
+        my @tokens = split('=', $_);
+        my $shortcut = shift(@tokens);
+        push @shortcuts, $shortcut;
+    }
+
+    # Längere Werte zuerst, damit bei Ersetzungen z.B. nicht 'S.W.R.' gefunden wird bevor der eigentliche Treffer 'S.W.R.3' versucht wurde
+    @sorted = sort { length($b) <=> length($a) } @shortcuts;
 
     return @sorted
 }
@@ -546,7 +566,7 @@ sub getMapping($$$$;$) {
 
 # Cmd von Attribut mit dem Format value=cmd pro Zeile lesen
 sub getCmd($$$$;$) {
-    my ($hash, $device, $reading, $channel, $disableLog) = @_;
+    my ($hash, $device, $reading, $key, $disableLog) = @_;
     my @rows, my $cmd;
     my $attrString = AttrVal($device, $reading, undef);
 
@@ -554,9 +574,9 @@ sub getCmd($$$$;$) {
     @rows = split(/\n/, $attrString);
 
     foreach (@rows) {
-        # Nur Zeilen mit gesuchten Channel verwenden
-        next unless $_ =~ qr/^$channel=/i;
-        $_ =~ s/$channel=//i;
+        # Nur Zeilen mit gesuchten Identifier verwenden
+        next unless $_ =~ qr/^$key=/i;
+        $_ =~ s/$key=//i;
         $cmd = $_;
 
         Log3($hash->{NAME}, 5, "cmd selected: $_") if (!defined($disableLog) || (defined($disableLog) && $disableLog != 1));
@@ -567,15 +587,20 @@ sub getCmd($$$$;$) {
 }
 
 
-# Cmd String im Format 'cmd', 'device:cmd' oder '{<perlcode}' ausführen
+# Cmd String im Format 'cmd', 'device:cmd', 'fhemcmd1; fhemcmd2' oder '{<perlcode}' ausführen
 sub runCmd($$$;$) {
     my ($hash, $device, $cmd, $val) = @_;
     my $error;
+    my $returnVal;
 
     # Perl Command?
     if ($cmd =~ m/^\s*{.*}\s*$/) {
         # CMD ausführen
-        main::SNIPS_execute($hash, $cmd, $device, $val);
+        $returnVal = main::SNIPS_execute($hash, $device, $cmd, $val);
+    }
+    # FHEM Command oder CommandChain?
+    elsif (defined($main::cmds{ (split " ", $cmd)[0] })) {
+        $error = AnalyzeCommandChain($hash, $cmd);
     }
     # Soll Command auf anderes Device umgelenkt werden?
     elsif ($cmd =~ m/:/) {
@@ -583,14 +608,15 @@ sub runCmd($$$;$) {
         $cmd = $cmd . ' ' . $val if (defined($val));
         $error = AnalyzeCommand($hash, "set $cmd");
     }
-    # Nur normales Fhem Cmd angegeben
+    # Nur normales Device Cmd angegeben
     else {
         $cmd = "$device $cmd";
         $cmd = $cmd . ' ' . $val if (defined($val));
         $error = AnalyzeCommand($hash, "set $cmd");
     }
-
     Log3($hash->{NAME}, 1, $_) if (defined($error));
+
+    return $returnVal;
 }
 
 
@@ -601,13 +627,8 @@ sub getValue($$$) {
 
     # Perl Command?
     if ($getString =~ m/^\s*{.*}\s*$/) {
-        # Nutervariablen setzen
-        #my $DEVICE = $device;
-
         # Wert lesen
-        #$value = eval $getString;
-        #Log3($hash->{NAME}, 1, $@) if ($@);
-        $value = main::SNIPS_execute($hash, $getString, $device, undef);
+        $value = runCmd($hash, $device, $getString);
     }
     # Fhem Command
     else {
@@ -651,6 +672,7 @@ sub parseJSON($$) {
     # JSON Decode und Fehlerüberprüfung
     my $decoded = eval { decode_json(encode_utf8($json)) };
     if ($@) {
+          Log3($hash->{NAME}, 1, "JSON decoding error: " . $@);
           return undef;
     }
 
@@ -679,7 +701,11 @@ sub parseJSON($$) {
 
     # Falls Info Dict angehängt ist, handelt es sich um einen mit Standardwerten über NLU umgeleiteten Request. -> Originalwerte wiederherstellen
     if (exists($decoded->{'id'})) {
-        my $info = decode_json(encode_utf8($decoded->{'id'}));
+        my $info = eval { decode_json(encode_utf8($decoded->{'id'})) };
+        if ($@) {
+              Log3($hash->{NAME}, 1, "JSON decoding error: " . $@);
+              return undef;
+        }
 
         $data->{'input'} = $info->{'input'} if defined($info->{'input'});
         $data->{'sessionId'} = $info->{'sessionId'} if defined($info->{'sessionId'});
@@ -702,6 +728,8 @@ sub parseJSON($$) {
 # Daten vom MQTT Modul empfangen -> Device und Room ersetzen, dann erneut an NLU übergeben
 sub onmessage($$$) {
     my ($hash, $topic, $message) = @_;
+    my $data = SNIPS::parseJSON($hash, $message);
+    my $input = $data->{'input'} if defined($data->{'input'});
 
     # Hotword Erkennung
     if ($topic =~ m/^hermes\/hotword/) {
@@ -722,6 +750,26 @@ sub onmessage($$$) {
         }
     }
 
+    # Shortcut empfangen -> Code direkt ausführen
+    elsif (defined($input) && grep( /^$input$/i, allSnipsShortcuts($hash))) {
+      my $error;
+      my $response = getResponse($hash, "DefaultError");
+      my $type      = ($topic eq "hermes/intent/FHEM:TextCommand") ? "text" : "voice";
+      my $sessionId = ($topic eq "hermes/intent/FHEM:TextCommand") ? ""     : $data->{'sessionId'};
+      my $cmd = getCmd($hash, $hash->{NAME}, "shortcuts", $input);
+
+      if (defined($cmd)) {
+          # Cmd ausführen
+          my $returnVal = runCmd($hash, undef, $cmd);
+          Log3($hash->{NAME}, 5, "ReturnVal: $returnVal");
+
+          $response = (defined($returnVal)) ? $returnVal : getResponse($hash, "DefaultConfirmation");
+      }
+
+      # Antwort senden
+      respond($hash, $type, $sessionId, $response);
+    }
+
     # Sprachintent von Snips empfangen -> Geräte- und Raumnamen ersetzen und Request erneut an NLU senden
     elsif ($topic =~ qr/^hermes\/intent\/.*:/) {
         my $info, my $sendData;
@@ -732,8 +780,6 @@ sub onmessage($$$) {
         my @colors = allSnipsColors();
         my $json, my $infoJson;
         my $sessionId;
-
-        my $data = SNIPS::parseJSON($hash, $message);
         my $command = $data->{'input'};
 
         # Geräte- und Raumbezeichnungen im Kommando gegen die Defaultbezeichnung aus dem Snips-Slot tauschen, damit NLU uns versteht
@@ -792,14 +838,9 @@ sub onmessage($$$) {
     # Intent von NLU empfangen
     elsif ($topic eq "hermes/nlu/intentParsed" && ($message =~ m/fhem.voiceCommand/ || $message =~ m/fhem.textCommand/)) {
         my $intent;
-        my $type;
-        my $data;
+        my $type = ($message =~ m/fhem.voiceCommand/) ? "voice" : "text";
 
-        # JSON parsen
-        $type = ($message =~ m/fhem.voiceCommand/) ? "voice" : "text";
-        $data = SNIPS::parseJSON($hash, $message);
         $data->{'requestType'} = $type;
-
         $intent = $data->{'intent'};
 
         # Readings updaten
@@ -848,19 +889,25 @@ sub respond($$$$) {
         readingsSingleUpdate($hash, "voiceResponse", $response, 1);
     }
     elsif ($type eq "text") {
+        Log3($hash->{NAME}, 5, "Response: $response");
         readingsSingleUpdate($hash, "textResponse", $response, 1);
     }
 }
 
 
-# Fehlertext festlegen
-sub errorResponse($) {
-    my ($hash) = @_;
-    my $response = "Da ist etwas schief gegangen.";
-    my $attrValue = AttrVal($hash->{NAME}, "errorResponse", undef);
+# Antworttexte festlegen
+sub getResponse($$) {
+    my ($hash, $identifier) = @_;
+    my $response;
 
-    $response = $attrValue if (defined($attrValue) && $attrValue ne "disabled");
-    $response = ""         if (defined($attrValue) && $attrValue eq "disabled");
+    my %messages = (
+        DefaultError => "Da ist etwas schief gegangen.",
+        NoActiveMediaDevice => "Kein Wiedergabegerät aktiv.",
+        DefaultConfirmation => "Ok."
+    );
+
+    $response = getCmd($hash, $hash->{NAME}, "response", $identifier);
+    $response = $messages{$identifier} if (!defined($response));
 
     return $response;
 }
@@ -936,12 +983,13 @@ sub updateModel($) {
     my @rooms = allSnipsRooms();
     my @channels = allSnipsChannels();
     my @colors = allSnipsColors();
+    my @shortcuts = allSnipsShortcuts($hash);
 
     # JSON Struktur erstellen
-    if (@devices > 0 || @rooms > 0 || @channels > 0) {
+    if (@devices > 0 || @rooms > 0 || @channels > 0 || @shortcuts > 0) {
       my $json;
-      my $injectData, my $deviceData, my $roomData, my $channelData, my $colorData;
-      my @operations, my @deviceOperation, my @roomOperation, my @channelOperation, my @ccolorOperation;
+      my $injectData, my $deviceData, my $roomData, my $channelData, my $colorData, my $shortcutData;
+      my @operations, my @deviceOperation, my @roomOperation, my @channelOperation, my @ccolorOperation, my @shortcutOperation;
 
       $deviceData->{'de.fhem.Device'} = \@devices;
       @deviceOperation = ('add', $deviceData);
@@ -955,10 +1003,14 @@ sub updateModel($) {
       $colorData->{'de.fhem.Color'} = \@colors;
       @ccolorOperation = ('add', $colorData);
 
+      $shortcutData->{'de.fhem.Shortcut'} = \@shortcuts;
+      @shortcutOperation = ('add', $shortcutData);
+
       push(@operations, \@deviceOperation) if @devices > 0;
       push(@operations, \@roomOperation) if @rooms > 0;
       push(@operations, \@channelOperation) if @channels > 0;
       push(@operations, \@ccolorOperation) if @colors > 0;
+      push(@operations, \@shortcutOperation) if @shortcuts > 0;
 
       $injectData->{'operations'} = \@operations;
       $json = eval { toJSON($injectData) };
@@ -1018,7 +1070,7 @@ sub handleCustomIntent($$$) {
                 Log3($hash->{NAME}, 5, $@);
             }
         }
-        $response = errorResponse($hash) if (!defined($response));
+        $response = getResponse($hash, "DefaultError") if (!defined($response));
 
         # Antwort senden
         respond ($hash, $data->{'requestType'}, $data->{sessionId}, $response);
@@ -1031,7 +1083,7 @@ sub handleIntentSetOnOff($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room;
     my $mapping;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentSetOnOff called");
 
@@ -1048,7 +1100,7 @@ sub handleIntentSetOnOff($$) {
             my $cmdOff = (defined($mapping->{'cmdOff'})) ? $mapping->{'cmdOff'} : "off";
             my $cmd = ($value eq 'an') ? $cmdOn : $cmdOff;
 
-            $response = "Ok";
+            $response = getResponse($hash, "DefaultConfirmation");
 
             # Cmd ausführen
             runCmd($hash, $device, $cmd);
@@ -1064,7 +1116,7 @@ sub handleIntentGetOnOff($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room, my $status;
     my $mapping;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentGetOnOff called");
 
@@ -1102,7 +1154,7 @@ sub handleIntentSetNumeric($$) {
     my $value, my $device, my $room, my $change, my $type, my $unit;
     my $mapping;
     my $validData = 0;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentSetNumeric called");
 
@@ -1134,7 +1186,7 @@ sub handleIntentSetNumeric($$) {
             $device = getDeviceByName($hash, $room, $data->{'Device'});
         } elsif (defined($type) && $type eq "Lautstärke") {
             $device = getActiveDeviceForIntentAndType($hash, $room, "SetNumeric", $type);
-            $response = "Kein Wiedergabegerät aktiv" if (!defined($device));
+            $response = getResponse($hash, "NoActiveMediaDevice") if (!defined($device));
         }
 
         if (defined($device)) {
@@ -1182,7 +1234,7 @@ sub handleIntentSetNumeric($$) {
                 }
 
                 if (defined($newVal)) {
-                    $response = "Ok";
+                    $response = getResponse($hash, "DefaultConfirmation");
 
                     # Begrenzung auf evtl. gesetzte min/max Werte
                     $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
@@ -1204,7 +1256,7 @@ sub handleIntentGetNumeric($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room, my $type;
     my $mapping;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentGetNumeric called");
 
@@ -1271,7 +1323,7 @@ sub handleIntentStatus($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room;
     my $mapping;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentStatus called");
 
@@ -1303,7 +1355,7 @@ sub handleIntentMediaControls($$) {
     my ($hash, $data) = @_;
     my $command, my $device, my $room;
     my $mapping;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentMediaControls called");
 
@@ -1317,7 +1369,7 @@ sub handleIntentMediaControls($$) {
             $device = getDeviceByName($hash, $room, $data->{'Device'});
         } else {
             $device = getActiveDeviceForIntentAndType($hash, $room, "MediaControls", undef);
-            $response = "Kein Wiedergabegerät aktiv" if (!defined($device));
+            $response = getResponse($hash, "NoActiveMediaDevice") if (!defined($device));
         }
 
         $mapping = getMapping($hash, $device, "MediaControls", undef);
@@ -1332,7 +1384,7 @@ sub handleIntentMediaControls($$) {
             elsif ($command =~ m/^zurück$/i) { $cmd = $mapping->{'cmdBack'}; }
 
             if (defined($cmd)) {
-                $response = "Ok";
+                $response = getResponse($hash, "DefaultConfirmation");
 
                 # Cmd ausführen
                 runCmd($hash, $device, $cmd);
@@ -1349,7 +1401,7 @@ sub handleIntentMediaChannels($$) {
     my ($hash, $data) = @_;
     my $channel, my $device, my $room;
     my $cmd;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentMediaChannels called");
 
@@ -1368,7 +1420,7 @@ sub handleIntentMediaChannels($$) {
         $cmd = getCmd($hash, $device, "snipsChannels", $channel, undef);
 
         if (defined($device) && defined($cmd)) {
-            $response = "Ok";
+            $response = getResponse($hash, "DefaultConfirmation");
 
             # Cmd ausführen
             runCmd($hash, $device, $cmd);
@@ -1384,7 +1436,7 @@ sub handleIntentSetColor($$) {
     my ($hash, $data) = @_;
     my $color, my $device, my $room;
     my $cmd;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentSetColor called");
 
@@ -1398,7 +1450,7 @@ sub handleIntentSetColor($$) {
         $cmd = getCmd($hash, $device, "snipsColors", $color, undef);
 
         if (defined($device) && defined($cmd)) {
-            $response = "Ok";
+            $response = getResponse($hash, "DefaultConfirmation");
 
             # Cmd ausführen
             runCmd($hash, $device, $cmd);
