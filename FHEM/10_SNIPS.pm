@@ -46,7 +46,7 @@ sub SNIPS_Initialize($) {
     $hash->{UndefFn} = "SNIPS::Undefine";
     $hash->{SetFn} = "SNIPS::Set";
     $hash->{AttrFn} = "SNIPS::Attr";
-    $hash->{AttrList} = "IODev defaultRoom snipsIntents:textField-long shortcuts:textField-long errorResponse " . $main::readingFnAttributes;
+    $hash->{AttrList} = "IODev defaultRoom snipsIntents:textField-long shortcuts:textField-long response:textField-long " . $main::readingFnAttributes;
     $hash->{OnMessageFn} = "SNIPS::onmessage";
 
     main::LoadModule("MQTT");
@@ -756,7 +756,7 @@ sub onmessage($$$) {
     # Shortcut empfangen -> Code direkt ausführen
     elsif (defined($input) && grep( /^$input$/i, allSnipsShortcuts($hash))) {
       my $error;
-      my $response = errorResponse($hash);
+      my $response = getResponse($hash, "DefaultError");
       my $type      = ($topic eq "hermes/intent/FHEM:TextCommand") ? "text" : "voice";
       my $sessionId = ($topic eq "hermes/intent/FHEM:TextCommand") ? ""     : $data->{'sessionId'};
       my $cmd = getCmd($hash, $hash->{NAME}, "shortcuts", $input);
@@ -897,14 +897,19 @@ sub respond($$$$) {
 }
 
 
-# Fehlertext festlegen
-sub errorResponse($) {
-    my ($hash) = @_;
-    my $response = "Da ist etwas schief gegangen.";
-    my $attrValue = AttrVal($hash->{NAME}, "errorResponse", undef);
+# Antworttexte festlegen
+sub getResponse($$) {
+    my ($hash, $identifier) = @_;
+    my $response;
 
-    $response = $attrValue if (defined($attrValue) && $attrValue ne "disabled");
-    $response = ""         if (defined($attrValue) && $attrValue eq "disabled");
+    my %messages = (
+        DefaultError => "Da ist etwas schief gegangen.",
+        NoActiveMediaDevice => "Kein Wiedergabegerät aktiv.",
+        DefaultConfirmation => "Ok."
+    )
+
+    $response = getCmd($hash, $hash->{NAME}, "response", $identifier);
+    $response = $messages{$identifier} if (!defined($response));
 
     return $response;
 }
@@ -1067,7 +1072,7 @@ sub handleCustomIntent($$$) {
                 Log3($hash->{NAME}, 5, $@);
             }
         }
-        $response = errorResponse($hash) if (!defined($response));
+        $response = getResponse($hash, "DefaultError") if (!defined($response));
 
         # Antwort senden
         respond ($hash, $data->{'requestType'}, $data->{sessionId}, $response);
@@ -1080,7 +1085,7 @@ sub handleIntentSetOnOff($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room;
     my $mapping;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentSetOnOff called");
 
@@ -1113,7 +1118,7 @@ sub handleIntentGetOnOff($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room, my $status;
     my $mapping;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentGetOnOff called");
 
@@ -1151,7 +1156,7 @@ sub handleIntentSetNumeric($$) {
     my $value, my $device, my $room, my $change, my $type, my $unit;
     my $mapping;
     my $validData = 0;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentSetNumeric called");
 
@@ -1183,7 +1188,7 @@ sub handleIntentSetNumeric($$) {
             $device = getDeviceByName($hash, $room, $data->{'Device'});
         } elsif (defined($type) && $type eq "Lautstärke") {
             $device = getActiveDeviceForIntentAndType($hash, $room, "SetNumeric", $type);
-            $response = "Kein Wiedergabegerät aktiv" if (!defined($device));
+            $response = getResponse($hash, "NoActiveMediaDevice") if (!defined($device));
         }
 
         if (defined($device)) {
@@ -1253,7 +1258,7 @@ sub handleIntentGetNumeric($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room, my $type;
     my $mapping;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentGetNumeric called");
 
@@ -1320,7 +1325,7 @@ sub handleIntentStatus($$) {
     my ($hash, $data) = @_;
     my $value, my $device, my $room;
     my $mapping;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentStatus called");
 
@@ -1352,7 +1357,7 @@ sub handleIntentMediaControls($$) {
     my ($hash, $data) = @_;
     my $command, my $device, my $room;
     my $mapping;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentMediaControls called");
 
@@ -1366,7 +1371,7 @@ sub handleIntentMediaControls($$) {
             $device = getDeviceByName($hash, $room, $data->{'Device'});
         } else {
             $device = getActiveDeviceForIntentAndType($hash, $room, "MediaControls", undef);
-            $response = "Kein Wiedergabegerät aktiv" if (!defined($device));
+            $response = getResponse($hash, "NoActiveMediaDevice") if (!defined($device));
         }
 
         $mapping = getMapping($hash, $device, "MediaControls", undef);
@@ -1398,7 +1403,7 @@ sub handleIntentMediaChannels($$) {
     my ($hash, $data) = @_;
     my $channel, my $device, my $room;
     my $cmd;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentMediaChannels called");
 
@@ -1433,7 +1438,7 @@ sub handleIntentSetColor($$) {
     my ($hash, $data) = @_;
     my $color, my $device, my $room;
     my $cmd;
-    my $response = errorResponse($hash);
+    my $response = getResponse($hash, "DefaultError");
 
     Log3($hash->{NAME}, 5, "handleIntentSetColor called");
 
