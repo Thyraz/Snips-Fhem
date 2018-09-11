@@ -590,9 +590,8 @@ sudo systemctl daemon-reload
 ```
 Dann den Autostart aktivieren und den Service gleich starten:
 ```
-sudo systemctl enable snips-tts-polly
-sudo systemctl stop snips-tts
-sudo systemctl start snips-tts-polly
+sudo systemctl enable snips-volume
+sudo systemctl start snips-volume
 ```
 Nun solltet ihr über `set <snips> volume siteId="default" volume="50"` im FHEM-Modul die Lautstärke regeln können.
 
