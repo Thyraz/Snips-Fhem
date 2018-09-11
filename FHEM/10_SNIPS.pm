@@ -54,7 +54,7 @@ sub SNIPS_Initialize($) {
 
 # Cmd in main:: ausführen damit User den Prefix nicht vor alle Perl-Aufrufe schreiben muss
 sub SNIPS_execute($$$$) {
-    my ($hash, $cmd, $device, $value) = @_;
+    my ($hash, $device, $cmd, $value) = @_;
     my $returnVal;
 
     # Nutervariablen setzen
@@ -591,11 +591,12 @@ sub getCmd($$$$;$) {
 sub runCmd($$$;$) {
     my ($hash, $device, $cmd, $val) = @_;
     my $error;
+    my $returnVal;
 
     # Perl Command?
     if ($cmd =~ m/^\s*{.*}\s*$/) {
         # CMD ausführen
-        main::SNIPS_execute($hash, $cmd, $device, $val);
+        $returnVal = main::SNIPS_execute($hash, $device, $cmd, $val);
     }
     # FHEM Command oder CommandChain?
     elsif (defined($main::cmds{ (split " ", $cmd)[0] })) {
@@ -613,8 +614,9 @@ sub runCmd($$$;$) {
         $cmd = $cmd . ' ' . $val if (defined($val));
         $error = AnalyzeCommand($hash, "set $cmd");
     }
-
     Log3($hash->{NAME}, 1, $_) if (defined($error));
+
+    return $returnVal;
 }
 
 
@@ -625,13 +627,8 @@ sub getValue($$$) {
 
     # Perl Command?
     if ($getString =~ m/^\s*{.*}\s*$/) {
-        # Nutervariablen setzen
-        #my $DEVICE = $device;
-
         # Wert lesen
-        #$value = eval $getString;
-        #Log3($hash->{NAME}, 1, $@) if ($@);
-        $value = main::SNIPS_execute($hash, $getString, $device, undef);
+        $value = runCmd($hash, $device, $getString);
     }
     # Fhem Command
     else {
@@ -764,8 +761,9 @@ sub onmessage($$$) {
       if (defined($cmd)) {
           # Cmd ausführen
           my $returnVal = runCmd($hash, undef, $cmd);
+          Log3($hash->{NAME}, 5, "ReturnVal: $returnVal");
 
-          $response = (defined($returnVal)) $returnVal ? "Ok";
+          $response = (defined($returnVal)) ? $returnVal : getResponse($hash, "DefaultConfirmation");
       }
 
       # Antwort senden
@@ -906,7 +904,7 @@ sub getResponse($$) {
         DefaultError => "Da ist etwas schief gegangen.",
         NoActiveMediaDevice => "Kein Wiedergabegerät aktiv.",
         DefaultConfirmation => "Ok."
-    )
+    );
 
     $response = getCmd($hash, $hash->{NAME}, "response", $identifier);
     $response = $messages{$identifier} if (!defined($response));
@@ -1102,7 +1100,7 @@ sub handleIntentSetOnOff($$) {
             my $cmdOff = (defined($mapping->{'cmdOff'})) ? $mapping->{'cmdOff'} : "off";
             my $cmd = ($value eq 'an') ? $cmdOn : $cmdOff;
 
-            $response = "Ok";
+            $response = getResponse($hash, "DefaultConfirmation");
 
             # Cmd ausführen
             runCmd($hash, $device, $cmd);
@@ -1236,7 +1234,7 @@ sub handleIntentSetNumeric($$) {
                 }
 
                 if (defined($newVal)) {
-                    $response = "Ok";
+                    $response = getResponse($hash, "DefaultConfirmation");
 
                     # Begrenzung auf evtl. gesetzte min/max Werte
                     $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
@@ -1386,7 +1384,7 @@ sub handleIntentMediaControls($$) {
             elsif ($command =~ m/^zurück$/i) { $cmd = $mapping->{'cmdBack'}; }
 
             if (defined($cmd)) {
-                $response = "Ok";
+                $response = getResponse($hash, "DefaultConfirmation");
 
                 # Cmd ausführen
                 runCmd($hash, $device, $cmd);
@@ -1422,7 +1420,7 @@ sub handleIntentMediaChannels($$) {
         $cmd = getCmd($hash, $device, "snipsChannels", $channel, undef);
 
         if (defined($device) && defined($cmd)) {
-            $response = "Ok";
+            $response = getResponse($hash, "DefaultConfirmation");
 
             # Cmd ausführen
             runCmd($hash, $device, $cmd);
@@ -1452,7 +1450,7 @@ sub handleIntentSetColor($$) {
         $cmd = getCmd($hash, $device, "snipsColors", $color, undef);
 
         if (defined($device) && defined($cmd)) {
-            $response = "Ok";
+            $response = getResponse($hash, "DefaultConfirmation");
 
             # Cmd ausführen
             runCmd($hash, $device, $cmd);
