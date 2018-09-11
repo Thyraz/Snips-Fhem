@@ -161,6 +161,7 @@ __Wichtig:__ Nach all den nachfolgenden Änderungen muss immer ein ```set <snips
 Dadurch wird das Vokabular von Snips um eure Geräte- und Raumnamen erweitert.\
 Dies muss ebenfall ausgeführt werden nachdem eine neue Version eureres Assistenten (manuell oder über *sam install assistant*) installiert wurde,\
 da hier die nachträglich durch FHEM angelernten Worte wieder verloren gehen.
+Siehe auch [ASR Injection](#wichtig-asr-injection-installieren)
 
 Damit Snips Geräte aus FHEM erkennt und auch ansprechen/abfragen kann, sind ein paar Voraussetzungen zu erfüllen:
 
