@@ -762,10 +762,10 @@ sub onmessage($$$) {
       my $cmd = getCmd($hash, $hash->{NAME}, "shortcuts", $input);
 
       if (defined($cmd)) {
-          $response = "Ok";
-
           # Cmd ausführen
-          runCmd($hash, undef, $cmd);
+          my $returnVal = runCmd($hash, undef, $cmd);
+
+          $response = (defined($returnVal)) $returnVal ? "Ok";
       }
 
       # Antwort senden
