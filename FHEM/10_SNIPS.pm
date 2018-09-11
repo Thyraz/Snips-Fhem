@@ -597,13 +597,17 @@ sub runCmd($$$;$) {
         # CMD ausführen
         main::SNIPS_execute($hash, $cmd, $device, $val);
     }
+    # FHEM Command oder CommandChain?
+    elsif (defined($main::cmds{ (split " ", $cmd)[0] })) {
+        $error = AnalyzeCommandChain($hash, $cmd);
+    }
     # Soll Command auf anderes Device umgelenkt werden?
     elsif ($cmd =~ m/:/) {
         $cmd =~ s/:/ /;
         $cmd = $cmd . ' ' . $val if (defined($val));
         $error = AnalyzeCommand($hash, "set $cmd");
     }
-    # Nur normales Fhem Cmd angegeben
+    # Nur normales Device Cmd angegeben
     else {
         $cmd = "$device $cmd";
         $cmd = $cmd . ' ' . $val if (defined($val));
@@ -671,6 +675,7 @@ sub parseJSON($$) {
     # JSON Decode und Fehlerüberprüfung
     my $decoded = eval { decode_json(encode_utf8($json)) };
     if ($@) {
+          Log3($hash->{NAME}, 1, "JSON decoding error: " . $@);
           return undef;
     }
 
@@ -699,7 +704,11 @@ sub parseJSON($$) {
 
     # Falls Info Dict angehängt ist, handelt es sich um einen mit Standardwerten über NLU umgeleiteten Request. -> Originalwerte wiederherstellen
     if (exists($decoded->{'id'})) {
-        my $info = decode_json(encode_utf8($decoded->{'id'}));
+        my $info = eval { decode_json(encode_utf8($decoded->{'id'})) };
+        if ($@) {
+              Log3($hash->{NAME}, 1, "JSON decoding error: " . $@);
+              return undef;
+        }
 
         $data->{'input'} = $info->{'input'} if defined($info->{'input'});
         $data->{'sessionId'} = $info->{'sessionId'} if defined($info->{'sessionId'});
@@ -750,14 +759,13 @@ sub onmessage($$$) {
       my $response = errorResponse($hash);
       my $type      = ($topic eq "hermes/intent/FHEM:TextCommand") ? "text" : "voice";
       my $sessionId = ($topic eq "hermes/intent/FHEM:TextCommand") ? ""     : $data->{'sessionId'};
-      my $cmd = getCmd($hash, $hash->{NAME}, "shortcuts", $input, undef);
+      my $cmd = getCmd($hash, $hash->{NAME}, "shortcuts", $input);
 
       if (defined($cmd)) {
           $response = "Ok";
 
           # Cmd ausführen
-          $error = AnalyzeCommandChain($hash, $cmd);
-          Log3($hash->{NAME}, 1, $_) if (defined($error));
+          runCmd($hash, undef, $cmd);
       }
 
       # Antwort senden
