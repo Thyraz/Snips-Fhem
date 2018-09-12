@@ -1310,7 +1310,7 @@ sub handleIntentGetNumeric($$) {
             elsif ($type eq "Wasserstand") { $response = "Der Wasserstand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value"; }
 
             # Standardantwort falls der Type überhaupt nicht bestimmt werden kann
-            else { $response = "Der Wert von " . { $response = $data->{'Device'}} . " beträgt $value."; }
+            else { $response = "Der Wert von " . $data->{'Device'} . " beträgt $value."; }
         }
     }
     # Antwort senden
