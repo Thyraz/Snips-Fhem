@@ -44,22 +44,17 @@ Die Besonderheit ist hier, dass Snips nach der Installation komplett Offline bet
 Es wir also keine Sprache zur Erkennung an einen Server im Internet geschickt.
 
 Man legt dafür im Snips Konfigurator unter https://console.snips.ai einen Account an und erstellt sich einen Assistenten indem man *Apps* erstellt oder bestehende hinzufügt.\
-Jede App kann mehrere Intents beinhalten welche Slots für bestimmte Begriffe (z.B. Gerätenamen, Räume, Schaltzustände, ...) beinhaltet.\
-Man *trainiert* die Intents dann mit verschiedensten Beispielsätzen damit der Assistent nachher möglichst gut entscheiden kann was der Nutzer von ihm will.
 
 Für das FHEM Modul ist eine fertige App zum Download auf console.snips.ai verfügbar
 
 ## Über Snips-Fhem
 Snips besteht aus mehreren Modulen (Hot-Word Detection, Texterkennung, Natural Language zu Intent Parser, ...)\
 All diese Module kommunizieren per MQTT miteinander.\
-Auch das resultiernde JSON Konstrukt, welches Snips am Ende ausspuckt wird über MQTT published.\
-Dieses beinhaltet den IntentNamen und die gesprochenen Wörter der einzelnen Slots. Also z.B. Gerätenamen, Raum, usw.
 
 Snips-Fhem wertet diese JSON Nachrichten aus und setzt sie entsprechend in Befehle um.\
 In die andere Richtung sendet Snips-Fhem ebenfalls Nachrichten an Snips um z.B. Antworten für TextToSpeech bereitzustellen.
 
-Snips-Fhem implementiert hierfür keinen eigene MQTT-Verbindung, sondern setzt dafür auf das bestehende 00_MQTT.pm Modul und meldet sich bei diesem als Client an.
-
+Snips-Fhem implementiert hierfür keinen eigene MQTT-Verbindung, sondern setzt dafür auf das bestehende 00_MQTT.pm Modul und meldet sich bei diesem als Client an.\
 Es muss vor dem Snips Modul also ein MQTT Device für den Snips MQTT Server in Fhem definiert werden.
 
 ## Assistent erstellen
@@ -108,7 +103,7 @@ define Snips SNIPS SnipsMQTT Wohnzimmer
   Snips per Text steuern.\
   Kann zum Beispiel mit diversen Messengerlösungen wie TelegramBot verwendet werden.\
   Das Kommando wird normal abgearbeitet als wäre es vom Nutzer gesprochen worden.\
-  Die Rückantwort wird aber nicht per TTS ausgegeben, sondern im Reading *textResponse* abgelegt.\
+  Die Rückantwort wird dann nicht per TTS ausgegeben, sondern im Reading *textResponse* bereitgestellt.\
   Beispiel `set <snipsDevice> textCommand Wie warm ist es im Wohnzimmer`
   
 * **updateModel**\
@@ -506,9 +501,6 @@ muss zusätzlich noch snips-asr-snip-asr-injection installiert werden:
    sudo apt-get install -y snips-asr-injection
 ```
 Andernfalls wird Snips eure Geräte- und Raumbezeichnungen nicht verstehen.
-
-Um die Liste der angelernten Wörter zurückzusetzen,
-reicht es den Assistenten in eure Snips Installation neu einzuspielen.
 
 ### Sound Setup
 über `aplay -l` und `arecord -l` kann man sich erkannte Soundkarten und Mikrofone anzeigen lassen.\
