@@ -519,6 +519,9 @@ muss zusätzlich noch snips-asr-snip-asr-injection installiert werden:
 ```
 Andernfalls wird Snips eure Geräte- und Raumbezeichnungen nicht verstehen.
 
+Um die Liste der angelernten Wörter zurückzusetzen,
+reicht es den Assistenten in eure Snips Installation neu einzuspielen.
+
 ### Sound Setup
 über `aplay -l` und `arecord -l` kann man sich erkannte Soundkarten und Mikrofone anzeigen lassen.\
 Hier ist jeweils die Nummer für "card" und "device" interessant.
