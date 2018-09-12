@@ -29,6 +29,11 @@ https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-p
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[SetColor](#setcolor)\
 [Für Fortgeschrittene: Eigene Custom Intents erstellen und in FHEM darauf reagieren](#f%C3%BCr-fortgeschrittene-eigene-custom-intents-erstellen-und-in-fhem-darauf-reagieren)\
 [Anhang 1: Snips Installation](#snips-installation)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Raspberry Pi](#raspberry-pi)\
+&nbsp;&nbsp;&nbsp;&nbsp;[PC / AMD64](#amd64)\
+&nbsp;&nbsp;&nbsp;&nbsp;[WICHTIG: ASR Injection installieren](#wichtig-asr-injection-installieren)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Sound Setup](#sound-setup)\
+&nbsp;&nbsp;&nbsp;&nbsp;[Assistent installieren](#assistent-installieren)\
 [Anhang 2: Erweiterungen für Snips](#erweiterungen-für-snips)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Lautstärke von Snips aus FHEM heraus steuern](#lautst%C3%A4rke-von-snips-aus-fhem-heraus-steuern)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Bessere Sprachausgabe mit Amazon Polly](#bessere-sprachausgabe-mit-amazon-polly)
@@ -149,9 +154,15 @@ define Snips SNIPS SnipsMQTT Wohnzimmer
   
 ## Attribute
 
-* **errorResponse**\
-  Standardtext den das Snips-Modul bei einem Fehler ausgibt.\
-  Die Ausgabe kann durch den Wert `disabled` deaktiviert werden.
+* **response**\
+  Hier können verschiedene Standardantworten vom Snips Modul definiert werden.\
+  Verfügbare Schlüsselwörter sind bisher *DefaultError*, *NoActiveMediaDevice* und *DefaultConfirmation*.\
+  
+  Beispielkonfiguration:
+  ```
+  DefaultError=
+  DefaultConfirmation=Klaro, mach ich
+  ```
 
 * **snipsIntents**\
   Siehe Kapitel *Custom Intents erstellen*
@@ -427,7 +438,7 @@ Eine bebilderte Anleitung zum Erstellen eines Intents, der zugehörigen Slots un
 https://snips.gitbook.io/documentation/console/set-intents#create-a-new-intent
 
 ### Anfragen zum Custom Intent in Fhem entgegen nehmen
-Wird der Satz von Snips erkannt, erhält FHEM als Intent-Name *Abfall* geliefert und für den Slot **Type** den Begriff aus dem Slot.\
+Wird der Satz von Snips erkannt, erhält FHEM als Intent-Name *Abfall* geliefert und für den **Slot Type** den Begriff aus dem Slot.\
 Im Snips Modul in FHEM kann einem Intent dann über das Attribut __*snipsIntents*__ eine Perl Funktion z.B. aus 99_myUtils.pm zugewiesen werden.\
 Pro Intent wird hier eine neue Zeile hinzugefügt. Diese hat folgenden Syntax:
 ```
