@@ -53,13 +53,14 @@ sub SNIPS_Initialize($) {
 }
 
 # Cmd in main:: ausführen damit User den Prefix nicht vor alle Perl-Aufrufe schreiben muss
-sub SNIPS_execute($$$$) {
-    my ($hash, $device, $cmd, $value) = @_;
+sub SNIPS_execute($$$$$) {
+    my ($hash, $device, $cmd, $value, $siteId) = @_;
     my $returnVal;
 
     # Nutervariablen setzen
     my $DEVICE = $device;
     my $VALUE = $value;
+    my $ROOM = (defined($siteId) && $siteId == "default") ? $hash->{helper}{defaultRoom} : $siteId;
 
     # CMD ausführen
     $returnVal = eval $cmd;
@@ -282,6 +283,37 @@ sub allSnipsChannels() {
 
     # Längere Werte zuerst, damit bei Ersetzungen z.B. nicht 'S.W.R.' gefunden wird bevor der eigentliche Treffer 'S.W.R.3' versucht wurde
     @sorted = sort { length($b) <=> length($a) } @channels;
+
+    return @sorted
+}
+
+
+# Alle NumericTypes sammeln
+sub allSnipsTypes() {
+    my @types, my @sorted;
+    my %typesHash;
+    my $devspec = "room=Snips";
+    my @devs = devspec2array($devspec);
+
+    # Alle SnipsNames sammeln
+    foreach (@devs) {
+        my @mappings = split(/\n/, AttrVal($_,"snipsMapping",undef));
+        foreach (@mappings) {
+            # Nur GetNumeric und SetNumeric verwenden
+            next unless $_ =~ m/^(SetNumeric|GetNumeric)/;
+            $_ =~ s/(SetNumeric|GetNumeric)://;
+            my %mapping = splitMappingString($_);
+
+            push @types, $mapping{'type'} if (defined($mapping{'type'}));
+        }
+    }
+
+    # Doubletten rausfiltern
+    %typesHash = map { if (defined($_)) { $_, 1 } else { () } } @types;
+    @types = keys %typesHash;
+
+    # Längere Werte zuerst, damit bei Ersetzungen z.B. nicht 'S.W.R.' gefunden wird bevor der eigentliche Treffer 'S.W.R.3' versucht wurde
+    @sorted = sort { length($b) <=> length($a) } @types;
 
     return @sorted
 }
@@ -530,7 +562,7 @@ sub splitMappingString($) {
     push(@tokens, $token) if (length($token) > 0);
 
     # Tokens in Keys/Values trennen
-    my %parsedMapping = map {split /=/, $_, 2} @tokens;
+    %parsedMapping = map {split /=/, $_, 2} @tokens;
 
     return %parsedMapping;
 }
@@ -553,7 +585,7 @@ sub getMapping($$$$;$) {
             my %currentMapping = splitMappingString($_);
 
             # Erstes Mapping vom passenden Intent wählen (unabhängig vom Type), dann ggf. weitersuchen ob noch ein besserer Treffer mit passendem Type kommt
-            if (!defined($matchedMapping) || (defined($type) && $matchedMapping->{'type'} ne $type && $currentMapping{'type'} eq $type)) {
+            if (!defined($matchedMapping) || (defined($type) && lc($matchedMapping->{'type'}) ne lc($type) && lc($currentMapping{'type'}) eq lc($type))) {
                 $matchedMapping = \%currentMapping;
 
                 Log3($hash->{NAME}, 5, "snipsMapping selected: $_") if (!defined($disableLog) || (defined($disableLog) && $disableLog != 1));
@@ -588,15 +620,15 @@ sub getCmd($$$$;$) {
 
 
 # Cmd String im Format 'cmd', 'device:cmd', 'fhemcmd1; fhemcmd2' oder '{<perlcode}' ausführen
-sub runCmd($$$;$) {
-    my ($hash, $device, $cmd, $val) = @_;
+sub runCmd($$$;$$) {
+    my ($hash, $device, $cmd, $val,$siteId) = @_;
     my $error;
     my $returnVal;
 
     # Perl Command?
     if ($cmd =~ m/^\s*{.*}\s*$/) {
         # CMD ausführen
-        $returnVal = main::SNIPS_execute($hash, $device, $cmd, $val);
+        $returnVal = main::SNIPS_execute($hash, $device, $cmd, $val,$siteId);
     }
     # FHEM Command oder CommandChain?
     elsif (defined($main::cmds{ (split " ", $cmd)[0] })) {
@@ -625,7 +657,7 @@ sub getValue($$$) {
     my ($hash, $device, $getString) = @_;
     my $value;
 
-    # Perl Command?
+    # Perl Command? -> Umleiten zu runCmd
     if ($getString =~ m/^\s*{.*}\s*$/) {
         # Wert lesen
         $value = runCmd($hash, $device, $getString);
@@ -677,7 +709,7 @@ sub parseJSON($$) {
     }
 
     # Standard-Keys auslesen
-    ($data->{'intent'} = $decoded->{'intent'}{'intentName'}) =~ s/^.*.://;;
+    ($data->{'intent'} = $decoded->{'intent'}{'intentName'}) =~ s/^.*.://;
     $data->{'probability'} = $decoded->{'intent'}{'probability'};
     $data->{'sessionId'} = $decoded->{'sessionId'};
     $data->{'siteId'} = $decoded->{'siteId'};
@@ -703,8 +735,7 @@ sub parseJSON($$) {
     if (exists($decoded->{'id'})) {
         my $info = eval { decode_json(encode_utf8($decoded->{'id'})) };
         if ($@) {
-              Log3($hash->{NAME}, 1, "JSON decoding error: " . $@);
-              return undef;
+            $info = undef;
         }
 
         $data->{'input'} = $info->{'input'} if defined($info->{'input'});
@@ -714,6 +745,7 @@ sub parseJSON($$) {
         $data->{'Room'} = $info->{'Room'} if defined($info->{'Room'});
         $data->{'Channel'} = $info->{'Channel'} if defined($info->{'Channel'});
         $data->{'Color'} = $info->{'Color'} if defined($info->{'Color'});
+        $data->{'Type'} = $info->{'Type'} if defined($info->{'Type'});
     }
 
     foreach (keys %{ $data }) {
@@ -751,7 +783,7 @@ sub onmessage($$$) {
     }
 
     # Shortcut empfangen -> Code direkt ausführen
-    elsif (defined($input) && grep( /^$input$/i, allSnipsShortcuts($hash))) {
+    elsif ($topic =~ qr/^hermes\/intent\/.*:/ && defined($input) && grep( /^$input$/i, allSnipsShortcuts($hash))) {
       my $error;
       my $response = getResponse($hash, "DefaultError");
       my $type      = ($topic eq "hermes/intent/FHEM:TextCommand") ? "text" : "voice";
@@ -760,8 +792,7 @@ sub onmessage($$$) {
 
       if (defined($cmd)) {
           # Cmd ausführen
-          my $returnVal = runCmd($hash, undef, $cmd);
-          Log3($hash->{NAME}, 5, "ReturnVal: $returnVal");
+          my $returnVal = runCmd($hash, undef, $cmd, undef, $data->{'siteId'});
 
           $response = (defined($returnVal)) ? $returnVal : getResponse($hash, "DefaultConfirmation");
       }
@@ -773,23 +804,23 @@ sub onmessage($$$) {
     # Sprachintent von Snips empfangen -> Geräte- und Raumnamen ersetzen und Request erneut an NLU senden
     elsif ($topic =~ qr/^hermes\/intent\/.*:/) {
         my $info, my $sendData;
-        my $device, my $room, my $channel, my $color;
+        my $device, my $room, my $channel, my $color, my $type;
         my @devices = allSnipsNames();
         my @rooms = allSnipsRooms();
         my @channels = allSnipsChannels();
         my @colors = allSnipsColors();
+        my @types = allSnipsTypes();
         my $json, my $infoJson;
         my $sessionId;
         my $command = $data->{'input'};
 
         # Geräte- und Raumbezeichnungen im Kommando gegen die Defaultbezeichnung aus dem Snips-Slot tauschen, damit NLU uns versteht
         # Alle Werte in ein Array und der Länge nach sortieren, damit z.B. "Jazz Radio" nicht fehlerhafterweise als "Radio" erkannt wird
-        my @keys = (@devices, @rooms, @channels, @colors);
+        my @keys = (@devices, @rooms, @channels, @colors, @types);
         my @sortedKeys = sort { length($b) <=> length($a) } @keys;
 
         foreach my $key (@sortedKeys) {
             if ($command =~ qr/$key/i) {
-                # Wert kam ursprünglich aus @devices
                 if (grep( /^$key$/, @devices)) {
                     $device = lc($key);
                     $command =~ s/$key/standardgerät/i;
@@ -806,6 +837,10 @@ sub onmessage($$$) {
                     $color = lc($key);
                     $command =~ s/$key/standardfarbe/i;
                 }
+                elsif ( grep( /^$key$/, @types ) ) {
+                    $type = lc($key);
+                    $command =~ s/$key/standardtyp/i;
+                }
             }
         }
 
@@ -817,7 +852,8 @@ sub onmessage($$$) {
             Device      => $device,
             Room        => $room,
             Channel     => $channel,
-            Color       => $color
+            Color       => $color,
+            Type        => $type
         };
         $infoJson = toJSON($info);
 
@@ -983,13 +1019,14 @@ sub updateModel($) {
     my @rooms = allSnipsRooms();
     my @channels = allSnipsChannels();
     my @colors = allSnipsColors();
+    my @types = allSnipsTypes();
     my @shortcuts = allSnipsShortcuts($hash);
 
     # JSON Struktur erstellen
-    if (@devices > 0 || @rooms > 0 || @channels > 0 || @shortcuts > 0) {
+    if (@devices > 0 || @rooms > 0 || @channels > 0 || @types > 0 || @shortcuts > 0) {
       my $json;
-      my $injectData, my $deviceData, my $roomData, my $channelData, my $colorData, my $shortcutData;
-      my @operations, my @deviceOperation, my @roomOperation, my @channelOperation, my @ccolorOperation, my @shortcutOperation;
+      my $injectData, my $deviceData, my $roomData, my $channelData, my $colorData, my $typeData, my $shortcutData;
+      my @operations, my @deviceOperation, my @roomOperation, my @channelOperation, my @ccolorOperation, my @typeOperation, my @shortcutOperation;
 
       $deviceData->{'de.fhem.Device'} = \@devices;
       @deviceOperation = ('add', $deviceData);
@@ -1003,6 +1040,9 @@ sub updateModel($) {
       $colorData->{'de.fhem.Color'} = \@colors;
       @ccolorOperation = ('add', $colorData);
 
+      $typeData->{'de.fhem.NumericType'} = \@types;
+      @typeOperation = ('add', $typeData);
+
       $shortcutData->{'de.fhem.Shortcuts'} = \@shortcuts;
       @shortcutOperation = ('add', $shortcutData);
 
@@ -1010,6 +1050,7 @@ sub updateModel($) {
       push(@operations, \@roomOperation) if @rooms > 0;
       push(@operations, \@channelOperation) if @channels > 0;
       push(@operations, \@ccolorOperation) if @colors > 0;
+      push(@operations, \@typeOperation) if @types > 0;
       push(@operations, \@shortcutOperation) if @shortcuts > 0;
 
       $injectData->{'operations'} = \@operations;
@@ -1308,6 +1349,9 @@ sub handleIntentGetNumeric($$) {
             elsif ($type eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . ($isNumber ? " Prozent" : ""); }
             elsif ($type eq "Batterie") { $response = "Der Batteriestand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . ($isNumber ?  " beträgt $value Prozent" : " ist $value"); }
             elsif ($type eq "Wasserstand") { $response = "Der Wasserstand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value"; }
+
+            # Antwort wenn Custom Type
+            elsif (defined($mappingType)) { $response = "$mappingType von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value"; }
 
             # Standardantwort falls der Type überhaupt nicht bestimmt werden kann
             else { $response = "Der Wert von " . $data->{'Device'} . " beträgt $value."; }
