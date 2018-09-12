@@ -47,19 +47,7 @@ Man legt dafür im Snips Konfigurator unter https://console.snips.ai einen Accou
 Jede App kann mehrere Intents beinhalten welche Slots für bestimmte Begriffe (z.B. Gerätenamen, Räume, Schaltzustände, ...) beinhaltet.\
 Man *trainiert* die Intents dann mit verschiedensten Beispielsätzen damit der Assistent nachher möglichst gut entscheiden kann was der Nutzer von ihm will.
 
-Snips kann so sehr gut verschiedene Intents unterscheiden, ohne dass man diese z.B. wie bei Alexa mit ansagen muss.\
-Es ist also nicht wie bei Alexa Custom Skills nötig eine Frage so zu bilden:
-> Alexa, frage SmartHome wie viele Fenster sind geöffnet?
-
-Sondern kann die Frage direkt aussprechen:
-> Hey Snips, wieviele Fenster sind geöffnet.
-
-Snips unterstüzt "Satelliten" um weitere Räume anzubinden.
-Dies können z.B. weitere Raspberry Pi mit Mikrofon und einen kleinen Lautsprecher sein.
-Die Software für die Satelliten benötigt keine schnelle Hardware, kann also auch ein Pi Zero sein.
-
-Wenn man seinen Assistent fertig konfiguriert hat, kann man ihn als Zip Datei herunterladen und in die Snips Installation einspielen.\
-Ab da funktioniert die Spracherkennung lokal auf dem System.
+Für das FHEM Modul ist eine fertige App zum Download auf console.snips.ai verfügbar
 
 ## Über Snips-Fhem
 Snips besteht aus mehreren Modulen (Hot-Word Detection, Texterkennung, Natural Language zu Intent Parser, ...)\
