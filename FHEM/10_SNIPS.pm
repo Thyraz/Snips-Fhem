@@ -621,16 +621,25 @@ sub getCmd($$$$;$) {
 
 # Cmd String im Format 'cmd', 'device:cmd', 'fhemcmd1; fhemcmd2' oder '{<perlcode}' ausführen
 sub runCmd($$$;$$) {
-    my ($hash, $device, $cmd, $val,$siteId) = @_;
+    my ($hash, $device, $cmd, $val, $siteId) = @_;
     my $error;
     my $returnVal;
 
-    # Perl Command?
+    # Perl Command
     if ($cmd =~ m/^\s*{.*}\s*$/) {
         # CMD ausführen
         $returnVal = main::SNIPS_execute($hash, $device, $cmd, $val,$siteId);
     }
-    # FHEM Command oder CommandChain?
+    # String in Anführungszeichen (mit ReplaceSetMagic)
+    elsif ($cmd =~ m/^\s*".*"\s*$/) {
+        $cmd = s/^\s*"//;
+        $cmd = s/"\s*$//;
+        # TODO: Variablen ersetzen? (https://www.cs.ait.ac.th/~on/O/oreilly/perl/cookbook/ch01_09.htm)
+        $returnVal = ReplaceReadingsVal($hash, $mapping->{'response'});
+        # Escapte Kommas wieder durch normale ersetzen
+        $returnVal =~ s/\\,/,/;
+    }
+    # FHEM Command oder CommandChain
     elsif (defined($main::cmds{ (split " ", $cmd)[0] })) {
         $error = AnalyzeCommandChain($hash, $cmd);
     }
@@ -640,7 +649,7 @@ sub runCmd($$$;$$) {
         $cmd = $cmd . ' ' . $val if (defined($val));
         $error = AnalyzeCommand($hash, "set $cmd");
     }
-    # Nur normales Device Cmd angegeben
+    # Nur normales Cmd angegeben
     else {
         $cmd = "$device $cmd";
         $cmd = $cmd . ' ' . $val if (defined($val));
@@ -653,16 +662,21 @@ sub runCmd($$$;$$) {
 
 
 # Wert über Format 'reading', 'device:reading' oder '{<perlcode}' lesen
-sub getValue($$$) {
-    my ($hash, $device, $getString) = @_;
+sub getValue($$$;$$) {
+    my ($hash, $device, $getString, $val, $siteId) = @_;
     my $value;
 
     # Perl Command? -> Umleiten zu runCmd
     if ($getString =~ m/^\s*{.*}\s*$/) {
         # Wert lesen
-        $value = runCmd($hash, $device, $getString);
+        $value = runCmd($hash, $device, $getString, $val, $siteId);
     }
-    # Fhem Command
+    # String in Anführungszeichen -> Umleiten zu runCmd
+    elsif ($cmd =~ m/^\s*".*"\s*$/) {
+        # Wert lesen
+        $value = runCmd($hash, $device, $getString, $val, $siteId);
+    }
+    # Reading oder Device:Reading
     else {
       # Soll Reading von einem anderen Device gelesen werden?
       my $readingsDev = ($getString =~ m/:/) ? (split(/:/, $getString))[0] : $device;
@@ -1173,8 +1187,9 @@ sub handleIntentGetOnOff($$) {
             # Gerät ein- oder ausgeschaltet?
             $value = getOnOffState($hash, $device, $mapping);
 
-            # Antwort erstellen
-            if    ($status =~ m/^(an|aus)$/ && $value == 1) { $response = $data->{'Device'} . " ist eingeschaltet"; }
+            # Antwort bestimmen
+            if    (defined($mapping->{'response'})) { $response = getValue($hash, $device, $getString, $val, $room); }
+            elsif ($status =~ m/^(an|aus)$/ && $value == 1) { $response = $data->{'Device'} . " ist eingeschaltet"; }
             elsif ($status =~ m/^(an|aus)$/ && $value == 0) { $response = $data->{'Device'} . " ist ausgeschaltet"; }
             elsif ($status =~ m/^(auf|zu)$/ && $value == 1) { $response = $data->{'Device'} . " ist geöffnet"; }
             elsif ($status =~ m/^(auf|zu)$/ && $value == 0) { $response = $data->{'Device'} . " ist geschlossen"; }
@@ -1377,16 +1392,8 @@ sub handleIntentStatus($$) {
         $device = getDeviceByName($hash, $room, $data->{'Device'});
         $mapping = getMapping($hash, $device, "Status", undef);
 
-        if (defined($mapping)) {
-            # Perl-Code oder normaler Text?
-            if ($mapping->{'response'} =~ m/^\s*{.*}\s*$/) {
-                $response = getValue($hash, $device, $mapping->{'response'});
-            } else {
-                # Werte aus Readings nach dem Schema [Device:Reading] im String ersetzen
-                $response = ReplaceReadingsVal($hash, $mapping->{'response'});
-                # Escapte Kommas wieder durch normale ersetzen
-                $response =~ s/\\,/,/;
-            }
+        if (defined($mapping->{'response'})) {
+            $response = getValue($hash, $device, $getString, $val, $room);
         }
     }
     # Antwort senden
