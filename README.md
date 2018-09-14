@@ -295,7 +295,7 @@ Dies ist z.B. nützlich um die Einheit hinter dem Wert abzuschneiden.
   
 * ##### Status
   Intent zur Abfrage von Informationen zu einem Gerät.\ Der Antworttext kann frei gewählt werden, 
-  Beispiel: `Status:response=Temperatur ist [Thermo:temp] Grad bei [Thermo:hum] Prozent Luftfeuchtigkeit`\
+  Beispiel: `Status:response="Temperatur ist [Thermo:temp] Grad bei [Thermo:hum] Prozent Luftfeuchtigkeit"`\
   oder\
   `Status:response={my $value=ReadingsVal("device","reading",""); return "Der Wert beträgt $value";}`\
   \
