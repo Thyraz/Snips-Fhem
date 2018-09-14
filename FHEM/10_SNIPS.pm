@@ -621,16 +621,34 @@ sub getCmd($$$$;$) {
 
 # Cmd String im Format 'cmd', 'device:cmd', 'fhemcmd1; fhemcmd2' oder '{<perlcode}' ausführen
 sub runCmd($$$;$$) {
-    my ($hash, $device, $cmd, $val,$siteId) = @_;
+    my ($hash, $device, $cmd, $val, $siteId) = @_;
     my $error;
     my $returnVal;
 
-    # Perl Command?
+    # Perl Command
     if ($cmd =~ m/^\s*{.*}\s*$/) {
         # CMD ausführen
         $returnVal = main::SNIPS_execute($hash, $device, $cmd, $val,$siteId);
     }
-    # FHEM Command oder CommandChain?
+    # String in Anführungszeichen (mit ReplaceSetMagic)
+    elsif ($cmd =~ m/^\s*".*"\s*$/) {
+        my $DEVICE = $device;
+        my $ROOM = $siteId;
+        my $VALUE = $val;
+
+        # Anführungszeichen entfernen
+        $cmd =~ s/^\s*"//;
+        $cmd =~ s/"\s*$//;
+
+        # Variablen ersetzen?
+        eval { $cmd =~ s/(\$\w+)/$1/eeg; };
+
+        # [DEVICE:READING] Einträge erstzen
+        $returnVal = ReplaceReadingsVal($hash, $cmd);
+        # Escapte Kommas wieder durch normale ersetzen
+        $returnVal =~ s/\\,/,/;
+    }
+    # FHEM Command oder CommandChain
     elsif (defined($main::cmds{ (split " ", $cmd)[0] })) {
         $error = AnalyzeCommandChain($hash, $cmd);
     }
@@ -640,7 +658,7 @@ sub runCmd($$$;$$) {
         $cmd = $cmd . ' ' . $val if (defined($val));
         $error = AnalyzeCommand($hash, "set $cmd");
     }
-    # Nur normales Device Cmd angegeben
+    # Nur normales Cmd angegeben
     else {
         $cmd = "$device $cmd";
         $cmd = $cmd . ' ' . $val if (defined($val));
@@ -653,16 +671,21 @@ sub runCmd($$$;$$) {
 
 
 # Wert über Format 'reading', 'device:reading' oder '{<perlcode}' lesen
-sub getValue($$$) {
-    my ($hash, $device, $getString) = @_;
+sub getValue($$$;$$) {
+    my ($hash, $device, $getString, $val, $siteId) = @_;
     my $value;
 
     # Perl Command? -> Umleiten zu runCmd
     if ($getString =~ m/^\s*{.*}\s*$/) {
         # Wert lesen
-        $value = runCmd($hash, $device, $getString);
+        $value = runCmd($hash, $device, $getString, $val, $siteId);
     }
-    # Fhem Command
+    # String in Anführungszeichen -> Umleiten zu runCmd
+    elsif ($getString =~ m/^\s*".*"\s*$/) {
+        # Wert lesen
+        $value = runCmd($hash, $device, $getString, $val, $siteId);
+    }
+    # Reading oder Device:Reading
     else {
       # Soll Reading von einem anderen Device gelesen werden?
       my $readingsDev = ($getString =~ m/:/) ? (split(/:/, $getString))[0] : $device;
@@ -1122,7 +1145,7 @@ sub handleCustomIntent($$$) {
 # Eingehende "SetOnOff" Intents bearbeiten
 sub handleIntentSetOnOff($$) {
     my ($hash, $data) = @_;
-    my $value, my $device, my $room;
+    my $value, my $numericValue, my $device, my $room;
     my $mapping;
     my $response = getResponse($hash, "DefaultError");
 
@@ -1141,7 +1164,10 @@ sub handleIntentSetOnOff($$) {
             my $cmdOff = (defined($mapping->{'cmdOff'})) ? $mapping->{'cmdOff'} : "off";
             my $cmd = ($value eq 'an') ? $cmdOn : $cmdOff;
 
-            $response = getResponse($hash, "DefaultConfirmation");
+            # Antwort bestimmen
+            $numericValue = ($value eq 'an') ? 1 : 0;
+            if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $numericValue, $room); }
+            else { $response = getResponse($hash, "DefaultConfirmation"); }
 
             # Cmd ausführen
             runCmd($hash, $device, $cmd);
@@ -1173,8 +1199,9 @@ sub handleIntentGetOnOff($$) {
             # Gerät ein- oder ausgeschaltet?
             $value = getOnOffState($hash, $device, $mapping);
 
-            # Antwort erstellen
-            if    ($status =~ m/^(an|aus)$/ && $value == 1) { $response = $data->{'Device'} . " ist eingeschaltet"; }
+            # Antwort bestimmen
+            if    (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $value, $room); }
+            elsif ($status =~ m/^(an|aus)$/ && $value == 1) { $response = $data->{'Device'} . " ist eingeschaltet"; }
             elsif ($status =~ m/^(an|aus)$/ && $value == 0) { $response = $data->{'Device'} . " ist ausgeschaltet"; }
             elsif ($status =~ m/^(auf|zu)$/ && $value == 1) { $response = $data->{'Device'} . " ist geöffnet"; }
             elsif ($status =~ m/^(auf|zu)$/ && $value == 0) { $response = $data->{'Device'} . " ist geschlossen"; }
@@ -1275,11 +1302,13 @@ sub handleIntentSetNumeric($$) {
                 }
 
                 if (defined($newVal)) {
-                    $response = getResponse($hash, "DefaultConfirmation");
-
                     # Begrenzung auf evtl. gesetzte min/max Werte
                     $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
                     $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
+
+                    # Antwort festlegen
+                    if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $newVal, $room); }
+                    else { $response = getResponse($hash, "DefaultConfirmation"); }
 
                     # Cmd ausführen
                     runCmd($hash, $device, $cmd, $newVal);
@@ -1336,8 +1365,11 @@ sub handleIntentGetNumeric($$) {
             # Punkt durch Komma ersetzen in Dezimalzahlen
             $value =~ s/\./\,/g;
 
+            # Antwort falls Custom Response definiert ist
+            if    (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $value, $room); }
+
             # Antwort falls mappingType matched
-            if    ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
+            elsif ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
             elsif ($mappingType eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . ($isNumber ? " Grad" : ""); }
             elsif ($mappingType eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . ($isNumber ? " Prozent" : ""); }
             elsif ($mappingType eq "Batterie") { $response = "Der Batteriestand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . ($isNumber ?  " beträgt $value Prozent" : " ist $value"); }
@@ -1377,16 +1409,8 @@ sub handleIntentStatus($$) {
         $device = getDeviceByName($hash, $room, $data->{'Device'});
         $mapping = getMapping($hash, $device, "Status", undef);
 
-        if (defined($mapping)) {
-            # Perl-Code oder normaler Text?
-            if ($mapping->{'response'} =~ m/^\s*{.*}\s*$/) {
-                $response = getValue($hash, $device, $mapping->{'response'});
-            } else {
-                # Werte aus Readings nach dem Schema [Device:Reading] im String ersetzen
-                $response = ReplaceReadingsVal($hash, $mapping->{'response'});
-                # Escapte Kommas wieder durch normale ersetzen
-                $response =~ s/\\,/,/;
-            }
+        if (defined($mapping->{'response'})) {
+            $response = getValue($hash, $device, $mapping->{'response'},undef,  $room);
         }
     }
     # Antwort senden
@@ -1428,7 +1452,8 @@ sub handleIntentMediaControls($$) {
             elsif ($command =~ m/^zurück$/i) { $cmd = $mapping->{'cmdBack'}; }
 
             if (defined($cmd)) {
-                $response = getResponse($hash, "DefaultConfirmation");
+                if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $command, $room); }
+                else { $response = getResponse($hash, "DefaultConfirmation"); }
 
                 # Cmd ausführen
                 runCmd($hash, $device, $cmd);
