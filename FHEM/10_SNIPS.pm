@@ -632,10 +632,19 @@ sub runCmd($$$;$$) {
     }
     # String in Anführungszeichen (mit ReplaceSetMagic)
     elsif ($cmd =~ m/^\s*".*"\s*$/) {
-        $cmd = s/^\s*"//;
-        $cmd = s/"\s*$//;
-        # TODO: Variablen ersetzen? (https://www.cs.ait.ac.th/~on/O/oreilly/perl/cookbook/ch01_09.htm)
-        $returnVal = ReplaceReadingsVal($hash, $mapping->{'response'});
+        my $DEVICE = $device;
+        my $ROOM = $siteId;
+        my $VALUE = $val;
+
+        # Anführungszeichen entfernen
+        $cmd =~ s/^\s*"//;
+        $cmd =~ s/"\s*$//;
+
+        # Variablen ersetzen?
+        eval { $cmd =~ s/(\$\w+)/$1/eeg; };
+
+        # [DEVICE:READING] Einträge erstzen
+        $returnVal = ReplaceReadingsVal($hash, $cmd);
         # Escapte Kommas wieder durch normale ersetzen
         $returnVal =~ s/\\,/,/;
     }
@@ -672,7 +681,7 @@ sub getValue($$$;$$) {
         $value = runCmd($hash, $device, $getString, $val, $siteId);
     }
     # String in Anführungszeichen -> Umleiten zu runCmd
-    elsif ($cmd =~ m/^\s*".*"\s*$/) {
+    elsif ($getString =~ m/^\s*".*"\s*$/) {
         # Wert lesen
         $value = runCmd($hash, $device, $getString, $val, $siteId);
     }
@@ -1480,8 +1489,7 @@ sub handleIntentMediaChannels($$) {
         $cmd = getCmd($hash, $device, "snipsChannels", $channel, undef);
 
         if (defined($device) && defined($cmd)) {
-            if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $channel, $room); }
-            else { $response = getResponse($hash, "DefaultConfirmation"); }
+            $response = getResponse($hash, "DefaultConfirmation");
 
             # Cmd ausführen
             runCmd($hash, $device, $cmd);
@@ -1511,8 +1519,7 @@ sub handleIntentSetColor($$) {
         $cmd = getCmd($hash, $device, "snipsColors", $color, undef);
 
         if (defined($device) && defined($cmd)) {
-            if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $color, $room); }
-            else { $response = getResponse($hash, "DefaultConfirmation"); }
+            $response = getResponse($hash, "DefaultConfirmation");
 
             # Cmd ausführen
             runCmd($hash, $device, $cmd);
