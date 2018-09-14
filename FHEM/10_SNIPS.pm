@@ -1136,7 +1136,7 @@ sub handleCustomIntent($$$) {
 # Eingehende "SetOnOff" Intents bearbeiten
 sub handleIntentSetOnOff($$) {
     my ($hash, $data) = @_;
-    my $value, my $device, my $room;
+    my $value, my $numericValue, my $device, my $room;
     my $mapping;
     my $response = getResponse($hash, "DefaultError");
 
@@ -1155,7 +1155,10 @@ sub handleIntentSetOnOff($$) {
             my $cmdOff = (defined($mapping->{'cmdOff'})) ? $mapping->{'cmdOff'} : "off";
             my $cmd = ($value eq 'an') ? $cmdOn : $cmdOff;
 
-            $response = getResponse($hash, "DefaultConfirmation");
+            # Antwort bestimmen
+            $numericValue = ($value eq 'an') ? 1 : 0;
+            if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $numericValue, $room); }
+            else { $response = getResponse($hash, "DefaultConfirmation"); }
 
             # Cmd ausführen
             runCmd($hash, $device, $cmd);
@@ -1188,7 +1191,7 @@ sub handleIntentGetOnOff($$) {
             $value = getOnOffState($hash, $device, $mapping);
 
             # Antwort bestimmen
-            if    (defined($mapping->{'response'})) { $response = getValue($hash, $device, $getString, $val, $room); }
+            if    (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $value, $room); }
             elsif ($status =~ m/^(an|aus)$/ && $value == 1) { $response = $data->{'Device'} . " ist eingeschaltet"; }
             elsif ($status =~ m/^(an|aus)$/ && $value == 0) { $response = $data->{'Device'} . " ist ausgeschaltet"; }
             elsif ($status =~ m/^(auf|zu)$/ && $value == 1) { $response = $data->{'Device'} . " ist geöffnet"; }
@@ -1290,11 +1293,13 @@ sub handleIntentSetNumeric($$) {
                 }
 
                 if (defined($newVal)) {
-                    $response = getResponse($hash, "DefaultConfirmation");
-
                     # Begrenzung auf evtl. gesetzte min/max Werte
                     $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
                     $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
+
+                    # Antwort festlegen
+                    if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $newVal, $room); }
+                    else { $response = getResponse($hash, "DefaultConfirmation"); }
 
                     # Cmd ausführen
                     runCmd($hash, $device, $cmd, $newVal);
@@ -1351,8 +1356,11 @@ sub handleIntentGetNumeric($$) {
             # Punkt durch Komma ersetzen in Dezimalzahlen
             $value =~ s/\./\,/g;
 
+            # Antwort falls Custom Response definiert ist
+            if    (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $value, $room); }
+
             # Antwort falls mappingType matched
-            if    ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
+            elsif ($mappingType =~ m/^(Helligkeit|Lautstärke|Sollwert)$/) { $response = $data->{'Device'} . " ist auf $value gestellt."; }
             elsif ($mappingType eq "Temperatur") { $response = "Die Temperatur von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . ($isNumber ? " Grad" : ""); }
             elsif ($mappingType eq "Luftfeuchtigkeit") { $response = "Die Luftfeuchtigkeit von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . " beträgt $value" . ($isNumber ? " Prozent" : ""); }
             elsif ($mappingType eq "Batterie") { $response = "Der Batteriestand von " . (exists $data->{'Device'} ? $data->{'Device'} : $data->{'Room'}) . ($isNumber ?  " beträgt $value Prozent" : " ist $value"); }
@@ -1393,7 +1401,7 @@ sub handleIntentStatus($$) {
         $mapping = getMapping($hash, $device, "Status", undef);
 
         if (defined($mapping->{'response'})) {
-            $response = getValue($hash, $device, $getString, $val, $room);
+            $response = getValue($hash, $device, $mapping->{'response'},undef,  $room);
         }
     }
     # Antwort senden
@@ -1435,7 +1443,8 @@ sub handleIntentMediaControls($$) {
             elsif ($command =~ m/^zurück$/i) { $cmd = $mapping->{'cmdBack'}; }
 
             if (defined($cmd)) {
-                $response = getResponse($hash, "DefaultConfirmation");
+                if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $command, $room); }
+                else { $response = getResponse($hash, "DefaultConfirmation"); }
 
                 # Cmd ausführen
                 runCmd($hash, $device, $cmd);
@@ -1471,7 +1480,8 @@ sub handleIntentMediaChannels($$) {
         $cmd = getCmd($hash, $device, "snipsChannels", $channel, undef);
 
         if (defined($device) && defined($cmd)) {
-            $response = getResponse($hash, "DefaultConfirmation");
+            if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $channel, $room); }
+            else { $response = getResponse($hash, "DefaultConfirmation"); }
 
             # Cmd ausführen
             runCmd($hash, $device, $cmd);
@@ -1501,7 +1511,8 @@ sub handleIntentSetColor($$) {
         $cmd = getCmd($hash, $device, "snipsColors", $color, undef);
 
         if (defined($device) && defined($cmd)) {
-            $response = getResponse($hash, "DefaultConfirmation");
+            if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $color, $room); }
+            else { $response = getResponse($hash, "DefaultConfirmation"); }
 
             # Cmd ausführen
             runCmd($hash, $device, $cmd);
