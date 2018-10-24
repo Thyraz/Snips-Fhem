@@ -60,7 +60,7 @@ sub SNIPS_execute($$$$$) {
     # Nutervariablen setzen
     my $DEVICE = $device;
     my $VALUE = $value;
-    my $ROOM = (defined($siteId) && $siteId == "default") ? $hash->{helper}{defaultRoom} : $siteId;
+    my $ROOM = (defined($siteId) && $siteId eq "default") ? $hash->{helper}{defaultRoom} : $siteId;
 
     # CMD ausführen
     $returnVal = eval $cmd;
