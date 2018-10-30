@@ -1084,7 +1084,7 @@ sub updateModel($) {
       Log3($hash->{NAME}, 5, "Injecting data to ASR: $json");
 
       # ASR Inject über MQTT senden
-      MQTT::send_publish($hash->{IODev}, topic => 'hermes/asr/inject', message => $json, qos => 0, retain => "0");
+      MQTT::send_publish($hash->{IODev}, topic => 'hermes/injection/perform', message => $json, qos => 0, retain => "0");
     }
 }
 
