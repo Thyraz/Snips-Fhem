@@ -31,7 +31,7 @@ https://haus-automatisierung.com/hardware/sonoff/2017/12/20/sonoff-vorstellung-p
 [Anhang 1: Snips Installation](#snips-installation)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Raspberry Pi](#raspberry-pi)\
 &nbsp;&nbsp;&nbsp;&nbsp;[PC / AMD64](#amd64)\
-&nbsp;&nbsp;&nbsp;&nbsp;[WICHTIG: ASR Injection installieren](#wichtig-asr-injection-installieren)\
+&nbsp;&nbsp;&nbsp;&nbsp;[WICHTIG: Snips Injection installieren](#wichtig-snips-injection-installieren)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Sound Setup](#sound-setup)\
 &nbsp;&nbsp;&nbsp;&nbsp;[Assistent installieren](#assistent-installieren)\
 [Anhang 2: Erweiterungen für Snips](#erweiterungen-für-snips)\
@@ -155,7 +155,7 @@ __Wichtig:__ Nach all den nachfolgenden Änderungen muss immer ein ```set <snips
 Dadurch wird das Vokabular von Snips um eure Geräte- und Raumnamen erweitert.\
 Dies muss ebenfall ausgeführt werden nachdem eine neue Version eureres Assistenten (manuell oder über *sam install assistant*) installiert wurde,\
 da hier die nachträglich durch FHEM angelernten Worte wieder verloren gehen.
-Siehe auch [ASR Injection](#wichtig-asr-injection-installieren)
+Siehe auch [Snips Injection](#wichtig-snips-injection-installieren)
 
 Damit Snips Geräte aus FHEM erkennt und auch ansprechen/abfragen kann, sind ein paar Voraussetzungen zu erfüllen:
 
@@ -464,7 +464,7 @@ Gibt es Fehler beim Aufruf der Perl Funktion sollte man dies hier auch sehen.
 
 Wenn Snips eure Geräte- oder Raumnamen nicht versteht,\
 wurde evtl. das ASR Inject Paket nicht installiert:\
-[Installation ASR Injection](#wichtig-asr-injection-installieren)
+[Installation Snips Injection](#wichtig-snips-injection-installieren)
 
 Sollte Snips nach Aktualisierung eures Assistenten, dem Hinzufügen neuer Geräte, oder dem Ändern von snipsName oder snipsRoom Attributen Geräte- oder Raumbezeichnungen nicht mehr verstehen,\
 bitte sicherstellen, dass ```set <snipsDevice> updateModel``` ausgeführt wurde.
@@ -494,11 +494,11 @@ Wegen Systemd Installation danach evtl. neu booten.
 Dann Anleitung hier befolgen:\
 https://snips.gitbook.io/documentation/advanced-configuration/advanced-solutions
 
-### Wichtig: ASR Injection installieren
+### Wichtig: Snips Injection installieren
 Damit das FHEM Modul der Snips App eure Geräte- und Raumnamen zur Verfügung stellen kann,\
-muss zusätzlich noch snips-asr-snip-asr-injection installiert werden:
+muss zusätzlich noch snips-injection installiert werden:
 ```
-   sudo apt-get install -y snips-asr-injection
+   sudo apt-get install -y snips-injection
 ```
 Andernfalls wird Snips eure Geräte- und Raumbezeichnungen nicht verstehen.
 
