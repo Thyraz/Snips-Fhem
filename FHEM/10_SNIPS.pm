@@ -1166,13 +1166,13 @@ sub handleIntentSetOnOff($$) {
             my $cmdOff = (defined($mapping->{'cmdOff'})) ? $mapping->{'cmdOff'} : "off";
             my $cmd = ($value eq 'an') ? $cmdOn : $cmdOff;
 
+            # Cmd ausführen
+            runCmd($hash, $device, $cmd);
+            
             # Antwort bestimmen
             $numericValue = ($value eq 'an') ? 1 : 0;
             if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $numericValue, $room); }
             else { $response = getResponse($hash, "DefaultConfirmation"); }
-
-            # Cmd ausführen
-            runCmd($hash, $device, $cmd);
         }
     }
     # Antwort senden
@@ -1308,12 +1308,12 @@ sub handleIntentSetNumeric($$) {
                     $newVal = $minVal if (defined($minVal) && $newVal < $minVal);
                     $newVal = $maxVal if (defined($maxVal) && $newVal > $maxVal);
 
+                    # Cmd ausführen
+                    runCmd($hash, $device, $cmd, $newVal);
+                    
                     # Antwort festlegen
                     if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $newVal, $room); }
                     else { $response = getResponse($hash, "DefaultConfirmation"); }
-
-                    # Cmd ausführen
-                    runCmd($hash, $device, $cmd, $newVal);
                 }
             }
         }
@@ -1454,11 +1454,12 @@ sub handleIntentMediaControls($$) {
             elsif ($command =~ m/^zurück$/i) { $cmd = $mapping->{'cmdBack'}; }
 
             if (defined($cmd)) {
-                if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $command, $room); }
-                else { $response = getResponse($hash, "DefaultConfirmation"); }
-
                 # Cmd ausführen
                 runCmd($hash, $device, $cmd);
+                
+                # Antwort festlegen
+                if (defined($mapping->{'response'})) { $response = getValue($hash, $device, $mapping->{'response'}, $command, $room); }
+                else { $response = getResponse($hash, "DefaultConfirmation"); }
             }
         }
     }
