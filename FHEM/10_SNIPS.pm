@@ -735,7 +735,7 @@ sub parseJSON($$) {
 
     # Standard-Keys auslesen
     ($data->{'intent'} = $decoded->{'intent'}{'intentName'}) =~ s/^.*.://;
-    $data->{'probability'} = $decoded->{'intent'}{'confidence_score'};
+    $data->{'probability'} = $decoded->{'intent'}{'confidenceScore'};
     $data->{'sessionId'} = $decoded->{'sessionId'};
     $data->{'siteId'} = $decoded->{'siteId'};
     $data->{'input'} = $decoded->{'input'};
