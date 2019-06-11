@@ -156,6 +156,10 @@ sub Set($$$@) {
         my $text = join (" ", @values);
         SNIPS::say($hash, $text);
     }
+    elsif ($command eq "play") {
+        my $text = join (" ", @values);
+        SNIPS::playBytes($hash, $text);
+    }
     # TextCommand Cmd
     elsif ($command eq "textCommand") {
         my $text = join (" ", @values);
@@ -984,6 +988,18 @@ sub textCommand($$) {
     # Send fake command, so it's forwarded to NLU
     my $topic = "hermes/intent/FHEM:TextCommand";
     onmessage($hash, $topic, $message);
+}
+
+sub playBytes($$){
+    my ($hash, $cmd) = @_;
+    my $ifilename = $cmd;
+    open my $ifile, '<', $ifilename or die "could not open input file $!";
+    binmode $ifile;
+
+    # Read the binary data
+    $_ = do { local $/; <$ifile> };
+
+    MQTT::send_publish($hash->{IODev}, topic => 'hermes/audioServer/default/playBytes/0', message => $_, qos => 0, retain => "0");
 }
 
 
